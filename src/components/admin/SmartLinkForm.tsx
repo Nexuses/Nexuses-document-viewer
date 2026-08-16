@@ -8,7 +8,6 @@ import {
   SmartLinkContentType,
   slugify,
 } from '@/lib/smart-link-types';
-import { countPdfPages, uploadFile } from '@/lib/client-upload';
 
 const CONTENT_BUTTONS: { type: SmartLinkContentType; label: string }[] = [
   { type: 'pdf', label: 'Add PDF' },
@@ -21,6 +20,8 @@ const CONTENT_BUTTONS: { type: SmartLinkContentType; label: string }[] = [
   { type: 'utm', label: 'UTM' },
   { type: 'lead_form', label: 'Lead Form' },
 ];
+
+const URL_TYPES = new Set<SmartLinkContentType>(['pdf', 'ppt', 'video', 'image', 'doc', 'website']);
 
 function newItem(type: SmartLinkContentType): SmartLinkContentItem {
   return {
@@ -47,12 +48,21 @@ function contentSummary(item: SmartLinkContentItem): string {
   return item.type.replace('_', ' ');
 }
 
+function nameFromUrl(value: string) {
+  try {
+    const path = new URL(value).pathname.split('/').filter(Boolean).pop() || '';
+    return decodeURIComponent(path);
+  } catch {
+    return '';
+  }
+}
+
+const inputClass =
+  'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white';
+
 interface Props {
   initial?: SmartLink;
 }
-
-const FILE_INPUT_CLASS =
-  'block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-900 hover:file:bg-gray-200 cursor-pointer';
 
 export default function SmartLinkForm({ initial }: Props) {
   const router = useRouter();
@@ -66,7 +76,6 @@ export default function SmartLinkForm({ initial }: Props) {
   const [content, setContent] = useState<SmartLinkContentItem[]>(initial?.content || []);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null);
 
   const updateItem = (id: string, patch: Partial<SmartLinkContentItem>) => {
     setContent((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -77,55 +86,14 @@ export default function SmartLinkForm({ initial }: Props) {
     if (!isEdit && !slug) setSlug(slugify(value));
   };
 
-  const handleImageUpload = async (
-    file: File,
-    setter: (url: string) => void
-  ) => {
-    setUploading('media');
-    try {
-      const url = await uploadFile(file);
-      setter(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(null);
-    }
-  };
-
-  const handleContentFile = async (item: SmartLinkContentItem, file: File) => {
-    setUploading(item.id);
-    setError('');
-    try {
-      let pageCount = item.pageCount;
-      let slideCount = item.slideCount;
-
-      if (item.type === 'pdf') {
-        pageCount = await countPdfPages(file);
-      }
-
-      if (item.type === 'ppt') {
-        const metaForm = new FormData();
-        metaForm.append('file', file);
-        const metaRes = await fetch('/api/smart-links/pptx-meta', { method: 'POST', body: metaForm });
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          slideCount = meta.slideCount;
-        }
-      }
-
-      const url = await uploadFile(file);
-      updateItem(item.id, {
-        fileUrl: url,
-        fileName: file.name,
-        pageCount,
-        slideCount,
-        title: item.title || file.name,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(null);
-    }
+  const setItemUrl = (item: SmartLinkContentItem, value: string) => {
+    const fileName = nameFromUrl(value);
+    updateItem(item.id, {
+      url: value,
+      fileUrl: value,
+      fileName: fileName || item.fileName,
+      title: item.title || fileName,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,53 +137,40 @@ export default function SmartLinkForm({ initial }: Props) {
       <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Smart Link details</h2>
         <Field label="Title">
-          <input
-            required
-            value={title}
-            onChange={(e) => handleTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-          />
+          <input required value={title} onChange={(e) => handleTitle(e.target.value)} className={inputClass} />
         </Field>
         <Field label="Description">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-          />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputClass} />
         </Field>
-        <Field label="Cover Image">
+        <Field label="Cover Image URL">
           <input
-            type="file"
-            accept="image/*"
-            className={FILE_INPUT_CLASS}
-            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], setCoverImage)}
+            type="url"
+            placeholder="https://"
+            value={coverImage}
+            onChange={(e) => setCoverImage(e.target.value)}
+            className={inputClass}
           />
           {coverImage && <img src={coverImage} alt="" className="mt-2 h-24 rounded-lg object-cover" />}
         </Field>
-        <Field label="Company Logo">
+        <Field label="Company Logo URL">
           <input
-            type="file"
-            accept="image/*"
-            className={FILE_INPUT_CLASS}
-            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], setCompanyLogo)}
+            type="url"
+            placeholder="https://"
+            value={companyLogo}
+            onChange={(e) => setCompanyLogo(e.target.value)}
+            className={inputClass}
           />
           {companyLogo && <img src={companyLogo} alt="" className="mt-2 h-12 object-contain" />}
         </Field>
         <Field label="Slug">
-          <input
-            required
-            value={slug}
-            onChange={(e) => setSlug(slugify(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-          />
+          <input required value={slug} onChange={(e) => setSlug(slugify(e.target.value))} className={inputClass} />
           <p className="text-xs text-gray-500 mt-1">Public URL: /s/{slug || 'your-slug'}</p>
         </Field>
         <Field label="Status">
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+            className={inputClass}
           >
             <option value="draft">Draft</option>
             <option value="published">Published</option>
@@ -240,7 +195,7 @@ export default function SmartLinkForm({ initial }: Props) {
 
         <div className="space-y-3">
           {content.length === 0 && (
-            <p className="text-sm text-gray-500">Add PDFs, decks, videos, and more.</p>
+            <p className="text-sm text-gray-500">Add PDFs, decks, videos, and more by URL.</p>
           )}
           {content.map((item) => (
             <div key={item.id} className="border border-gray-200 rounded-xl p-4 space-y-3">
@@ -255,36 +210,52 @@ export default function SmartLinkForm({ initial }: Props) {
                 </button>
               </div>
 
-              {(item.type === 'pdf' || item.type === 'ppt' || item.type === 'video' || item.type === 'image' || item.type === 'doc') && (
-                <div>
+              {URL_TYPES.has(item.type) && (
+                <div className="space-y-2">
                   <input
-                    type="file"
-                    className={FILE_INPUT_CLASS}
-                    accept={
-                      item.type === 'pdf'
-                        ? 'application/pdf'
-                        : item.type === 'ppt'
-                          ? '.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                          : item.type === 'video'
-                            ? 'video/mp4,video/webm,video/quicktime'
-                            : item.type === 'image'
-                              ? 'image/*'
-                              : '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                    }
-                    onChange={(e) => e.target.files?.[0] && handleContentFile(item, e.target.files[0])}
+                    type="url"
+                    placeholder="https://"
+                    value={item.fileUrl || item.url || ''}
+                    onChange={(e) => setItemUrl(item, e.target.value)}
+                    className={inputClass}
                   />
-                  {uploading === item.id && <p className="text-xs text-gray-500 mt-1">Uploading…</p>}
-                  {item.fileName && <p className="text-xs text-gray-600 mt-1">{item.fileName}</p>}
+                  <input
+                    placeholder="Title (optional)"
+                    value={item.title || ''}
+                    onChange={(e) => updateItem(item.id, { title: e.target.value })}
+                    className={inputClass}
+                  />
+                  {item.type === 'pdf' && (
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Page count (optional)"
+                      value={item.pageCount || ''}
+                      onChange={(e) => updateItem(item.id, { pageCount: Number(e.target.value) || undefined })}
+                      className={inputClass}
+                    />
+                  )}
+                  {item.type === 'ppt' && (
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Slide count (optional)"
+                      value={item.slideCount || ''}
+                      onChange={(e) => updateItem(item.id, { slideCount: Number(e.target.value) || undefined })}
+                      className={inputClass}
+                    />
+                  )}
+                  {item.type === 'doc' && (
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Page count (optional)"
+                      value={item.pageCount || ''}
+                      onChange={(e) => updateItem(item.id, { pageCount: Number(e.target.value) || undefined })}
+                      className={inputClass}
+                    />
+                  )}
                 </div>
-              )}
-
-              {item.type === 'website' && (
-                <input
-                  placeholder="https://"
-                  value={item.url || ''}
-                  onChange={(e) => updateItem(item.id, { url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                />
               )}
 
               {item.type === 'html' && (
@@ -293,7 +264,7 @@ export default function SmartLinkForm({ initial }: Props) {
                   placeholder="<div>Your HTML</div>"
                   value={item.html || ''}
                   onChange={(e) => updateItem(item.id, { html: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                  className={inputClass}
                 />
               )}
 
@@ -307,7 +278,7 @@ export default function SmartLinkForm({ initial }: Props) {
                       onChange={(e) =>
                         updateItem(item.id, { utm: { ...item.utm, [key]: e.target.value } })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                      className={inputClass}
                     />
                   ))}
                 </div>
@@ -321,7 +292,7 @@ export default function SmartLinkForm({ initial }: Props) {
                     onChange={(e) =>
                       updateItem(item.id, { leadForm: { ...item.leadForm, heading: e.target.value } })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    className={inputClass}
                   />
                   {(['collectName', 'collectEmail', 'collectCompany'] as const).map((key) => (
                     <label key={key} className="flex items-center gap-2">
@@ -345,7 +316,6 @@ export default function SmartLinkForm({ initial }: Props) {
       </section>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {uploading === 'media' && <p className="text-sm text-gray-500">Uploading image…</p>}
 
       <button
         type="submit"
