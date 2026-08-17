@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSmartLinkActor } from '@/lib/auth';
 import {
   createSmartLink,
   getSmartLinks,
@@ -9,18 +9,19 @@ import {
 } from '@/lib/smart-links';
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
+  const actor = await getSmartLinkActor();
+  if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const links = await getSmartLinks();
+  const links =
+    actor.role === 'project' ? await getSmartLinks(actor.projectId) : await getSmartLinks();
   return NextResponse.json(links);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const actor = await getSmartLinkActor();
+    if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -39,14 +40,21 @@ export async function POST(request: NextRequest) {
     }
 
     const content: SmartLinkContentItem[] = Array.isArray(body.content) ? body.content : [];
+    const projectId = actor.role === 'project' ? actor.projectId : String(body.projectId || '').trim() || undefined;
+    const projectName = actor.role === 'project' ? actor.projectName : String(body.projectName || '').trim() || undefined;
+    const companyLogo =
+      String(body.companyLogo || '').trim() ||
+      (actor.role === 'project' ? actor.logoUrl || '' : '');
 
     const created = await createSmartLink({
       title,
       description: body.description || '',
       coverImage: body.coverImage || '',
-      companyLogo: body.companyLogo || '',
+      companyLogo,
       slug,
-      owner: session,
+      owner: actor.owner,
+      projectId,
+      projectName,
       status: body.status === 'published' ? 'published' : 'draft',
       content,
     });

@@ -5,44 +5,40 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
-const LOGO =
-  'https://cdn-nexlink.s3.us-east-2.amazonaws.com/Nexuses-full-logo-dark_8d412ea3-bf11-4fc6-af9c-bee7e51ef494.png';
+type PortalUser = {
+  name: string;
+  username: string;
+  projectName: string;
+  projectSlug: string;
+  logoUrl?: string;
+};
 
-const nav = [
-  { href: '/admin/dashboard', label: 'Dashboard', exact: true },
-  { href: '/admin/dashboard/smart-links', label: 'Smart Links' },
-  { href: '/admin/dashboard/projects', label: 'Project & User Management' },
-  { href: '/admin/dashboard/submissions', label: 'Leads' },
-];
-
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+export default function PortalShell({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<PortalUser | null>(null);
   const [ready, setReady] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const check = async () => {
-      try {
-        const response = await fetch('/api/auth/check');
-        const data = await response.json();
+    fetch('/api/auth/project-check')
+      .then(async (r) => {
+        const data = await r.json();
         if (!data.authenticated) {
-          router.push('/admin/login');
+          router.replace('/login');
           return;
         }
+        setUser(data.user);
         setReady(true);
-      } catch {
-        router.push('/admin/login');
-      }
-    };
-    check();
+      })
+      .catch(() => router.replace('/login'));
   }, [router]);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/admin/login');
+    await fetch('/api/auth/project-logout', { method: 'POST' });
+    router.push('/login');
   };
 
-  if (!ready) {
+  if (!ready || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
         Loading...
@@ -50,20 +46,34 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     );
   }
 
+  const nav = [
+    { href: '/portal/smart-links', label: 'Smart Links' },
+  ];
+
   return (
     <div className="h-screen overflow-hidden flex bg-gray-50">
       <aside className="w-64 h-screen shrink-0 bg-[#120C29] text-white flex flex-col">
         <div className="p-5 border-b border-white/10">
           <div className="bg-white rounded-xl px-3 py-3 flex justify-center">
-            <Image src={LOGO} alt="Nexuses Logo" width={160} height={48} className="object-contain" unoptimized />
+            {user.logoUrl ? (
+              <img src={user.logoUrl} alt={user.projectName} className="h-12 object-contain" />
+            ) : (
+              <Image
+                src="https://cdn-nexlink.s3.us-east-2.amazonaws.com/Nexuses-full-logo-dark_8d412ea3-bf11-4fc6-af9c-bee7e51ef494.png"
+                alt="Nexuses Logo"
+                width={160}
+                height={48}
+                className="object-contain"
+                unoptimized
+              />
+            )}
           </div>
-          <p className="text-xs text-white/60 mt-3 tracking-wide uppercase">Master Admin</p>
+          <p className="text-sm font-semibold mt-3 truncate">{user.projectName}</p>
+          <p className="text-xs text-white/60 mt-1 truncate">Project Admin · {user.username}</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {nav.map((item) => {
-            const active = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
+            const active = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

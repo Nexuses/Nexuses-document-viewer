@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSmartLinkActor } from '@/lib/auth';
 import { createSmartLink, getSmartLinkById, slugExists, slugify } from '@/lib/smart-links';
 
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
+  const actor = await getSmartLinkActor();
+  if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
   const source = await getSmartLinkById(id);
   if (!source) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (actor.role === 'project' && source.projectId !== actor.projectId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -30,7 +33,9 @@ export async function POST(
     coverImage: source.coverImage,
     companyLogo: source.companyLogo,
     slug,
-    owner: session,
+    owner: actor.owner,
+    projectId: actor.role === 'project' ? actor.projectId : source.projectId,
+    projectName: actor.role === 'project' ? actor.projectName : source.projectName,
     status: 'draft',
     content: source.content || [],
   });

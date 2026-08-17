@@ -6,15 +6,23 @@ import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import type { SmartLink } from '@/lib/smart-link-types';
 
-export default function SmartLinksPage() {
+export default function PortalSmartLinksPage() {
   const [links, setLinks] = useState<SmartLink[]>([]);
+  const [projectName, setProjectName] = useState('your project');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const router = useRouter();
 
   const load = async () => {
-    const res = await fetch('/api/smart-links');
-    const data = await res.json();
+    const [linksRes, authRes] = await Promise.all([
+      fetch('/api/smart-links'),
+      fetch('/api/auth/project-check'),
+    ]);
+    const data = await linksRes.json();
     setLinks(Array.isArray(data) ? data : []);
+    if (authRes.ok) {
+      const auth = await authRes.json();
+      if (auth.user?.projectName) setProjectName(auth.user.projectName);
+    }
   };
 
   useEffect(() => {
@@ -33,7 +41,7 @@ export default function SmartLinksPage() {
     const res = await fetch(`/api/smart-links/${id}/duplicate`, { method: 'POST' });
     if (res.ok) {
       const created = await res.json();
-      router.push(`/admin/dashboard/smart-links/${created._id}/edit`);
+      router.push(`/portal/smart-links/${created._id}/edit`);
     }
   };
 
@@ -49,10 +57,12 @@ export default function SmartLinksPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Smart Links</h1>
-          <p className="text-sm text-gray-500 mt-1">Create and manage LinkedIn Smart Links</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Create and manage Smart Links for <span className="font-medium text-gray-700">{projectName}</span>
+          </p>
         </div>
         <Link
-          href="/admin/dashboard/smart-links/new"
+          href="/portal/smart-links/new"
           className="px-4 py-2.5 bg-[#120C29] text-white rounded-lg text-sm font-medium"
         >
           Create Smart Link
@@ -64,7 +74,6 @@ export default function SmartLinksPage() {
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
               <th className="px-4 py-3 font-medium">Smart Link Title</th>
-              <th className="px-4 py-3 font-medium">Project</th>
               <th className="px-4 py-3 font-medium">Owner</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Actions</th>
@@ -73,15 +82,14 @@ export default function SmartLinksPage() {
           <tbody>
             {links.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
-                  No smart links yet.
+                <td colSpan={4} className="px-4 py-10 text-center text-gray-500">
+                  No smart links for this project yet.
                 </td>
               </tr>
             )}
             {links.map((link) => (
               <tr key={link._id} className="border-t border-gray-100">
                 <td className="px-4 py-3 font-medium text-gray-900">{link.title}</td>
-                <td className="px-4 py-3 text-gray-600">{link.projectName || '—'}</td>
                 <td className="px-4 py-3 text-gray-600">{link.owner}</td>
                 <td className="px-4 py-3">
                   <span
@@ -96,10 +104,10 @@ export default function SmartLinksPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/admin/dashboard/smart-links/${link._id}`}>
+                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/portal/smart-links/${link._id}`}>
                       View
                     </Link>
-                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/admin/dashboard/smart-links/${link._id}/edit`}>
+                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/portal/smart-links/${link._id}/edit`}>
                       Edit
                     </Link>
                     <button className="text-xs font-semibold text-[#120C29] underline" type="button" onClick={() => duplicate(link._id!)}>

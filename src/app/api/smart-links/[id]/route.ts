@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSmartLinkActor } from '@/lib/auth';
 import {
   deleteSmartLink,
   getSmartLinkById,
@@ -8,17 +8,23 @@ import {
   updateSmartLink,
 } from '@/lib/smart-links';
 
+function canAccess(actor: Awaited<ReturnType<typeof getSmartLinkActor>>, projectId?: string) {
+  if (!actor) return false;
+  if (actor.role === 'master') return true;
+  return Boolean(projectId && projectId === actor.projectId);
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
+  const actor = await getSmartLinkActor();
+  if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
   const link = await getSmartLinkById(id);
-  if (!link) {
+  if (!link || !canAccess(actor, link.projectId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   return NextResponse.json(link);
@@ -29,13 +35,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const actor = await getSmartLinkActor();
+    if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { id } = await params;
     const existing = await getSmartLinkById(id);
-    if (!existing) {
+    if (!existing || !canAccess(actor, existing.projectId)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -69,11 +75,15 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) {
+  const actor = await getSmartLinkActor();
+  if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
+  const existing = await getSmartLinkById(id);
+  if (!existing || !canAccess(actor, existing.projectId)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   const ok = await deleteSmartLink(id);
   if (!ok) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });

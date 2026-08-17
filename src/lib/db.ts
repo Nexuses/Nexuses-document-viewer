@@ -482,3 +482,184 @@ export async function deleteUserSession(sessionId: string): Promise<boolean> {
   }
 }
 
+export interface Project {
+  _id?: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  createdAt?: Date;
+}
+
+export interface ProjectUser {
+  _id?: string;
+  name: string;
+  email?: string;
+  username: string;
+  password: string;
+  projectId: string;
+  projectName?: string;
+  createdAt?: Date;
+}
+
+export async function getProjects(): Promise<(Project & { userCount: number })[]> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const projects = await db.collection<Project>('projects').find({}).sort({ createdAt: -1 }).toArray();
+  const users = await db.collection<ProjectUser>('projectUsers').find({}).toArray();
+  const counts: Record<string, number> = {};
+  users.forEach((user) => {
+    const id = user.projectId;
+    counts[id] = (counts[id] || 0) + 1;
+  });
+  return projects.map((project) => ({
+    ...project,
+    _id: project._id?.toString(),
+    userCount: counts[project._id?.toString() || ''] || 0,
+  }));
+}
+
+export async function createProject(data: Omit<Project, '_id' | 'createdAt'>): Promise<Project> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const now = new Date();
+  const result = await db.collection<Project>('projects').insertOne({ ...data, createdAt: now });
+  return { ...data, _id: result.insertedId.toString(), createdAt: now };
+}
+
+export async function projectSlugExists(slug: string, excludeId?: string): Promise<boolean> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const filter: Record<string, unknown> = { slug };
+  if (excludeId && ObjectId.isValid(excludeId)) {
+    filter._id = { $ne: new ObjectId(excludeId) };
+  }
+  const count = await db.collection('projects').countDocuments(filter);
+  return count > 0;
+}
+
+export async function updateProject(
+  id: string,
+  data: Partial<Omit<Project, '_id' | 'createdAt'>>
+): Promise<Project | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const result = await db.collection('projects').updateOne(
+    { _id: new ObjectId(id) },
+    { $set: data }
+  );
+  if (result.matchedCount === 0) return null;
+  return getProjectById(id);
+}
+
+export async function deleteProject(id: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  await db.collection('projectUsers').deleteMany({ projectId: id });
+  const result = await db.collection('projects').deleteOne({ _id: new ObjectId(id) });
+  return result.deletedCount === 1;
+}
+
+export async function getProjectById(id: string): Promise<Project | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const project = await db.collection('projects').findOne({ _id: new ObjectId(id) });
+  if (!project) return null;
+  return {
+    _id: project._id?.toString(),
+    name: String(project.name || ''),
+    slug: String(project.slug || ''),
+    logoUrl: project.logoUrl ? String(project.logoUrl) : undefined,
+    createdAt: project.createdAt instanceof Date ? project.createdAt : undefined,
+  };
+}
+
+export async function getProjectUsers(): Promise<Omit<ProjectUser, 'password'>[]> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const users = await db.collection<ProjectUser>('projectUsers').find({}).sort({ createdAt: -1 }).toArray();
+  const projects = await db.collection<Project>('projects').find({}).toArray();
+  const names: Record<string, string> = {};
+  projects.forEach((project) => {
+    names[project._id?.toString() || ''] = project.name;
+  });
+  return users.map((user) => {
+    const { password: _password, ...rest } = user;
+    return {
+      ...rest,
+      _id: user._id?.toString(),
+      projectName: names[user.projectId] || '—',
+    };
+  });
+}
+
+export async function getProjectUserByUsername(username: string): Promise<ProjectUser | null> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const normalized = username.trim().toLowerCase();
+  const user = await db.collection<ProjectUser>('projectUsers').findOne({ username: normalized });
+  if (!user) return null;
+  return { ...user, _id: user._id?.toString() };
+}
+
+export async function projectUsernameExists(username: string, excludeId?: string): Promise<boolean> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const normalized = username.trim().toLowerCase();
+  const filter: Record<string, unknown> = { username: normalized };
+  if (excludeId && ObjectId.isValid(excludeId)) {
+    filter._id = { $ne: new ObjectId(excludeId) };
+  }
+  const count = await db.collection('projectUsers').countDocuments(filter);
+  return count > 0;
+}
+
+export async function createProjectUser(
+  data: Omit<ProjectUser, '_id' | 'createdAt' | 'projectName'>
+): Promise<Omit<ProjectUser, 'password'>> {
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const now = new Date();
+  const result = await db.collection<ProjectUser>('projectUsers').insertOne({ ...data, createdAt: now });
+  const { password: _password, ...rest } = data;
+  return { ...rest, _id: result.insertedId.toString(), createdAt: now };
+}
+
+export async function updateProjectUser(
+  id: string,
+  data: Partial<Omit<ProjectUser, '_id' | 'createdAt' | 'projectName'>>
+): Promise<Omit<ProjectUser, 'password'> | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const result = await db.collection('projectUsers').updateOne(
+    { _id: new ObjectId(id) },
+    { $set: data }
+  );
+  if (result.matchedCount === 0) return null;
+  const user = await db.collection('projectUsers').findOne({ _id: new ObjectId(id) });
+  if (!user) return null;
+  const project = ObjectId.isValid(String(user.projectId))
+    ? await db.collection('projects').findOne({ _id: new ObjectId(String(user.projectId)) })
+    : null;
+  return {
+    _id: user._id?.toString(),
+    name: String(user.name || ''),
+    email: user.email ? String(user.email) : undefined,
+    username: String(user.username || ''),
+    projectId: String(user.projectId || ''),
+    projectName: project?.name ? String(project.name) : '—',
+    createdAt: user.createdAt instanceof Date ? user.createdAt : undefined,
+  };
+}
+
+export async function deleteProjectUser(id: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const result = await db.collection('projectUsers').deleteOne({ _id: new ObjectId(id) });
+  return result.deletedCount === 1;
+}
+

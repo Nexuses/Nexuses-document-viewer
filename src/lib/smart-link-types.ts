@@ -48,12 +48,41 @@ export interface SmartLink {
   companyLogo?: string;
   slug: string;
   owner: string;
+  projectId?: string;
+  projectName?: string;
   status: SmartLinkStatus;
   content: SmartLinkContentItem[];
   views: number;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
+
+export type ProjectStat = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  users: number;
+  links: number;
+  published: number;
+  drafts: number;
+  documents: number;
+  views: number;
+  leads: number;
+};
+
+export type MasterAdminStats = {
+  totalProjects: number;
+  totalUsers: number;
+  totalSmartLinks: number;
+  publishedLinks: number;
+  draftLinks: number;
+  unassignedLinks: number;
+  totalDocuments: number;
+  totalViews: number;
+  leads: number;
+  projects: ProjectStat[];
+};
 
 export function slugify(value: string): string {
   return (

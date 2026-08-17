@@ -62,9 +62,13 @@ const inputClass =
 
 interface Props {
   initial?: SmartLink;
+  listPath?: string;
 }
 
-export default function SmartLinkForm({ initial }: Props) {
+export default function SmartLinkForm({
+  initial,
+  listPath = '/admin/dashboard/smart-links',
+}: Props) {
   const router = useRouter();
   const isEdit = Boolean(initial?._id);
   const [title, setTitle] = useState(initial?.title || '');
@@ -123,7 +127,7 @@ export default function SmartLinkForm({ initial }: Props) {
         setError(data.error || 'Save failed');
         return;
       }
-      router.push('/admin/dashboard/smart-links');
+      router.push(listPath);
       router.refresh();
     } catch {
       setError('An error occurred. Please try again.');

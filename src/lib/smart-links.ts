@@ -1,6 +1,6 @@
 import clientPromise from './mongodb';
 import { ObjectId } from 'mongodb';
-import type { SmartLink } from './smart-link-types';
+import type { MasterAdminStats, ProjectStat, SmartLink } from './smart-link-types';
 
 export type {
   SmartLink,
@@ -20,12 +20,13 @@ function mapDoc(doc: Omit<SmartLink, '_id'> & { _id?: ObjectId | string }): Smar
   };
 }
 
-export async function getSmartLinks(): Promise<SmartLink[]> {
+export async function getSmartLinks(projectId?: string): Promise<SmartLink[]> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
+  const filter = projectId ? { projectId } : {};
   const docs = await db
     .collection('smartLinks')
-    .find({})
+    .find(filter)
     .sort({ updatedAt: -1 })
     .toArray();
   return docs.map((doc) => mapDoc(doc as Omit<SmartLink, '_id'> & { _id?: ObjectId | string }));
@@ -103,26 +104,125 @@ export async function incrementSmartLinkViews(id: string): Promise<void> {
   await db.collection('smartLinks').updateOne({ _id: new ObjectId(id) }, { $inc: { views: 1 } });
 }
 
-export async function getSmartLinkStats() {
+const DOCUMENT_TYPES = new Set(['pdf', 'ppt', 'doc']);
+
+function documentCount(content: unknown): number {
+  if (!Array.isArray(content)) return 0;
+  return content.filter((item) => DOCUMENT_TYPES.has((item as { type?: string }).type || '')).length;
+}
+
+export async function getSmartLinkStats(): Promise<MasterAdminStats> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
-  const [totalSmartLinks, totalViewsAgg, leads, links] = await Promise.all([
-    db.collection('smartLinks').countDocuments(),
-    db.collection('smartLinks').aggregate([{ $group: { _id: null, views: { $sum: '$views' } } }]).toArray(),
-    db.collection('formSubmissions').countDocuments(),
-    db.collection('smartLinks').find({}, { projection: { content: 1 } }).toArray(),
+  const [projects, users, links, submissions] = await Promise.all([
+    db.collection('projects').find({}).sort({ name: 1 }).toArray(),
+    db.collection('projectUsers').find({}, { projection: { projectId: 1 } }).toArray(),
+    db
+      .collection('smartLinks')
+      .find(
+        {},
+        {
+          projection: {
+            projectId: 1,
+            projectName: 1,
+            status: 1,
+            views: 1,
+            content: 1,
+            slug: 1,
+          },
+        }
+      )
+      .toArray(),
+    db
+      .collection('formSubmissions')
+      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1 } })
+      .toArray(),
   ]);
 
-  const documentTypes = new Set(['pdf', 'ppt', 'doc']);
-  const totalDocuments = links.reduce((sum, link) => {
-    const content = (link.content as { type?: string }[] | undefined) || [];
-    return sum + content.filter((item) => documentTypes.has(item.type || '')).length;
-  }, 0);
+  const emptyProject = (): Omit<ProjectStat, 'id' | 'name' | 'slug' | 'logoUrl'> => ({
+    users: 0,
+    links: 0,
+    published: 0,
+    drafts: 0,
+    documents: 0,
+    views: 0,
+    leads: 0,
+  });
+
+  const byProject = new Map<string, ProjectStat>();
+  for (const project of projects) {
+    const id = project._id?.toString() || '';
+    byProject.set(id, {
+      id,
+      name: String(project.name || 'Untitled'),
+      slug: String(project.slug || ''),
+      logoUrl: project.logoUrl ? String(project.logoUrl) : undefined,
+      ...emptyProject(),
+    });
+  }
+
+  for (const user of users) {
+    const id = String(user.projectId || '');
+    const row = byProject.get(id);
+    if (row) row.users += 1;
+  }
+
+  const linkIdToProject = new Map<string, string>();
+  const slugToProject = new Map<string, string>();
+  let publishedLinks = 0;
+  let draftLinks = 0;
+  let unassignedLinks = 0;
+  let totalDocuments = 0;
+  let totalViews = 0;
+
+  for (const link of links) {
+    const projectId = String(link.projectId || '');
+    const views = Number(link.views || 0);
+    const docs = documentCount(link.content);
+    const published = link.status === 'published';
+    totalDocuments += docs;
+    totalViews += views;
+    if (published) publishedLinks += 1;
+    else draftLinks += 1;
+
+    const linkId = link._id?.toString();
+    if (linkId) linkIdToProject.set(linkId, projectId);
+    if (link.slug) slugToProject.set(String(link.slug), projectId);
+
+    const row = byProject.get(projectId);
+    if (!row) {
+      unassignedLinks += 1;
+      continue;
+    }
+    row.links += 1;
+    row.views += views;
+    row.documents += docs;
+    if (published) row.published += 1;
+    else row.drafts += 1;
+  }
+
+  let leads = 0;
+  for (const submission of submissions) {
+    leads += 1;
+    const fromId = submission.smartLinkId ? linkIdToProject.get(String(submission.smartLinkId)) : undefined;
+    const fromSlug = submission.smartLinkSlug
+      ? slugToProject.get(String(submission.smartLinkSlug))
+      : undefined;
+    const projectId = fromId || fromSlug || '';
+    const row = byProject.get(projectId);
+    if (row) row.leads += 1;
+  }
 
   return {
-    totalSmartLinks,
+    totalProjects: projects.length,
+    totalUsers: users.length,
+    totalSmartLinks: links.length,
+    publishedLinks,
+    draftLinks,
+    unassignedLinks,
     totalDocuments,
-    totalViews: totalViewsAgg[0]?.views ?? 0,
+    totalViews,
     leads,
+    projects: Array.from(byProject.values()),
   };
 }
