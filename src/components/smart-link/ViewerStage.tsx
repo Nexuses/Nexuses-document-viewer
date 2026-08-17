@@ -33,7 +33,11 @@ export function ViewerToolbar({
           <>
             <button
               type="button"
-              onClick={onPrev}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPrev();
+              }}
               disabled={page <= 1}
               className="w-8 h-8 flex items-center justify-center disabled:opacity-35"
               aria-label="Previous page"
@@ -47,7 +51,11 @@ export function ViewerToolbar({
             </span>
             <button
               type="button"
-              onClick={onNext}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onNext();
+              }}
               disabled={page >= (pages || 1)}
               className="w-8 h-8 flex items-center justify-center disabled:opacity-35"
               aria-label="Next page"

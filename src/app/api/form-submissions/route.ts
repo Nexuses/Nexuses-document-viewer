@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createFormSubmission, getFormSubmissions, deleteFormSubmission } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { getSession, getSmartLinkActor } from '@/lib/auth';
+import { getSmartLinks } from '@/lib/smart-links';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const actor = await getSmartLinkActor(request);
+    if (!actor) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const submissions = await getFormSubmissions();
-    return NextResponse.json(submissions);
+    if (actor.role === 'master') {
+      return NextResponse.json(submissions);
+    }
+
+    const links = await getSmartLinks(actor.projectId);
+    const ids = new Set(links.map((link) => link._id).filter(Boolean) as string[]);
+    const slugs = new Set(links.map((link) => link.slug));
+    const scoped = submissions.filter((submission) => {
+      const id = submission.smartLinkId || '';
+      const slug = submission.smartLinkSlug || '';
+      return (id && ids.has(id)) || (slug && slugs.has(slug));
+    });
+    return NextResponse.json(scoped);
   } catch (error) {
     console.error('Error fetching form submissions:', error);
     return NextResponse.json(

@@ -26,6 +26,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
+        document.cookie = 'workspace=admin; path=/; SameSite=Lax';
         router.push('/admin/dashboard');
       } else {
         setError(data.error || 'Login failed');

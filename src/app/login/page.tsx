@@ -26,7 +26,8 @@ export default function ProjectUserLoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        router.push('/portal/smart-links');
+        document.cookie = 'workspace=portal; path=/; SameSite=Lax';
+        router.push('/portal');
       } else {
         setError(data.error || 'Login failed');
       }

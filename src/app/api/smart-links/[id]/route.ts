@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSmartLinkActor } from '@/lib/auth';
+import { getProjectById } from '@/lib/db';
 import {
   deleteSmartLink,
   getSmartLinkById,
@@ -11,14 +12,14 @@ import {
 function canAccess(actor: Awaited<ReturnType<typeof getSmartLinkActor>>, projectId?: string) {
   if (!actor) return false;
   if (actor.role === 'master') return true;
-  return Boolean(projectId && projectId === actor.projectId);
+  return Boolean(projectId && String(projectId) === String(actor.projectId));
 }
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const actor = await getSmartLinkActor();
+  const actor = await getSmartLinkActor(_request);
   if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -35,7 +36,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await getSmartLinkActor();
+    const actor = await getSmartLinkActor(request);
     if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -63,6 +64,19 @@ export async function PATCH(
       updates.slug = slug;
     }
 
+    if (actor.role === 'master' && typeof body.projectId === 'string') {
+      const projectId = body.projectId.trim();
+      if (!projectId) {
+        return NextResponse.json({ error: 'Select a project for this Smart Link' }, { status: 400 });
+      }
+      const project = await getProjectById(projectId);
+      if (!project?._id) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 400 });
+      }
+      updates.projectId = project._id;
+      updates.projectName = project.name;
+    }
+
     const updated = await updateSmartLink(id, updates);
     return NextResponse.json(updated);
   } catch (error) {
@@ -75,7 +89,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const actor = await getSmartLinkActor();
+  const actor = await getSmartLinkActor(_request);
   if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

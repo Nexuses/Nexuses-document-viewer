@@ -12,6 +12,7 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 
 export async function createSession(email: string) {
   const cookieStore = await cookies();
+  cookieStore.delete('project-user-session');
   cookieStore.set('admin-session', email, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -70,6 +71,7 @@ export type SmartLinkActor =
 
 export async function createProjectUserSession(session: ProjectUserSession) {
   const cookieStore = await cookies();
+  cookieStore.delete('admin-session');
   cookieStore.set('project-user-session', JSON.stringify(session), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -94,21 +96,30 @@ export async function deleteProjectUserSession() {
   cookieStore.delete('project-user-session');
 }
 
-export async function getSmartLinkActor(): Promise<SmartLinkActor | null> {
-  const master = await getSession();
-  if (master) return { role: 'master', owner: master };
-
+export async function getSmartLinkActor(request?: { headers: Headers }): Promise<SmartLinkActor | null> {
+  const cookieStore = await cookies();
+  const master = cookieStore.get('admin-session')?.value || null;
   const projectUser = await getProjectUserSession();
-  if (projectUser) {
-    return {
-      role: 'project',
-      owner: projectUser.username,
-      projectId: projectUser.projectId,
-      projectName: projectUser.projectName,
-      projectSlug: projectUser.projectSlug,
-      logoUrl: projectUser.logoUrl,
-    };
-  }
+  const workspace = cookieStore.get('workspace')?.value || '';
+  const referer = request?.headers.get('referer') || '';
+  const isPortal = workspace === 'portal' || /\/portal(\/|$)/.test(referer);
+  const isAdmin = workspace === 'admin' || /\/admin(\/|$)/.test(referer);
+
+  const asMaster = (): SmartLinkActor => ({ role: 'master', owner: master! });
+  const asProject = (): SmartLinkActor => ({
+    role: 'project',
+    owner: projectUser!.username,
+    projectId: String(projectUser!.projectId),
+    projectName: projectUser!.projectName,
+    projectSlug: projectUser!.projectSlug,
+    logoUrl: projectUser!.logoUrl,
+  });
+
+  if (isPortal && projectUser) return asProject();
+  if (isAdmin && master) return asMaster();
+  if (master && !projectUser) return asMaster();
+  if (projectUser) return asProject();
+  if (master) return asMaster();
   return null;
 }
 

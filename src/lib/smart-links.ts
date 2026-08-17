@@ -1,6 +1,6 @@
 import clientPromise from './mongodb';
 import { ObjectId } from 'mongodb';
-import type { MasterAdminStats, ProjectStat, SmartLink } from './smart-link-types';
+import type { MasterAdminStats, ProjectAdminStats, ProjectStat, SmartLink } from './smart-link-types';
 
 export type {
   SmartLink,
@@ -14,16 +14,23 @@ function mapDoc(doc: Omit<SmartLink, '_id'> & { _id?: ObjectId | string }): Smar
   return {
     ...doc,
     _id: doc._id?.toString(),
+    projectId: doc.projectId != null ? String(doc.projectId) : undefined,
     content: doc.content || [],
     views: doc.views ?? 0,
     status: doc.status || 'draft',
   };
 }
 
+function projectScope(projectId: string) {
+  const values: Array<string | ObjectId> = [String(projectId)];
+  if (ObjectId.isValid(projectId)) values.push(new ObjectId(projectId));
+  return { projectId: { $in: values } };
+}
+
 export async function getSmartLinks(projectId?: string): Promise<SmartLink[]> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
-  const filter = projectId ? { projectId } : {};
+  const filter = projectId ? projectScope(projectId) : {};
   const docs = await db
     .collection('smartLinks')
     .find(filter)
@@ -66,6 +73,7 @@ export async function createSmartLink(
   const now = new Date();
   const doc = {
     ...data,
+    projectId: data.projectId ? String(data.projectId) : undefined,
     views: data.views ?? 0,
     content: data.content || [],
     createdAt: now,
@@ -82,9 +90,14 @@ export async function updateSmartLink(
   if (!ObjectId.isValid(id)) return null;
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
+  const patch = {
+    ...data,
+    ...(data.projectId != null ? { projectId: String(data.projectId) } : {}),
+    updatedAt: new Date(),
+  };
   await db.collection('smartLinks').updateOne(
     { _id: new ObjectId(id) },
-    { $set: { ...data, updatedAt: new Date() } }
+    { $set: patch }
   );
   return getSmartLinkById(id);
 }
@@ -224,5 +237,67 @@ export async function getSmartLinkStats(): Promise<MasterAdminStats> {
     totalViews,
     leads,
     projects: Array.from(byProject.values()),
+  };
+}
+
+export async function getProjectAdminStats(projectId: string): Promise<ProjectAdminStats> {
+  const empty: ProjectAdminStats = {
+    projectName: '',
+    totalSmartLinks: 0,
+    publishedLinks: 0,
+    draftLinks: 0,
+    totalDocuments: 0,
+    totalViews: 0,
+    leads: 0,
+    users: 0,
+  };
+  if (!ObjectId.isValid(projectId)) return empty;
+
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+
+  const [project, users, links, submissions] = await Promise.all([
+    db.collection('projects').findOne({ _id: new ObjectId(projectId) }),
+    db.collection('projectUsers').countDocuments({ projectId }),
+    db
+      .collection('smartLinks')
+      .find(projectScope(projectId), { projection: { status: 1, views: 1, content: 1, slug: 1 } })
+      .toArray(),
+    db
+      .collection('formSubmissions')
+      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1 } })
+      .toArray(),
+  ]);
+
+  const linkIds = new Set(links.map((link) => link._id?.toString()).filter(Boolean) as string[]);
+  const slugs = new Set(links.map((link) => String(link.slug || '')).filter(Boolean));
+
+  let publishedLinks = 0;
+  let draftLinks = 0;
+  let totalDocuments = 0;
+  let totalViews = 0;
+  for (const link of links) {
+    const published = link.status === 'published';
+    if (published) publishedLinks += 1;
+    else draftLinks += 1;
+    totalDocuments += documentCount(link.content);
+    totalViews += Number(link.views || 0);
+  }
+
+  const leads = submissions.filter((submission) => {
+    const id = submission.smartLinkId ? String(submission.smartLinkId) : '';
+    const slug = submission.smartLinkSlug ? String(submission.smartLinkSlug) : '';
+    return (id && linkIds.has(id)) || (slug && slugs.has(slug));
+  }).length;
+
+  return {
+    projectName: project?.name ? String(project.name) : '',
+    totalSmartLinks: links.length,
+    publishedLinks,
+    draftLinks,
+    totalDocuments,
+    totalViews,
+    leads,
+    users,
   };
 }

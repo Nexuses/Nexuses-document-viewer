@@ -14,6 +14,9 @@ type PortalUser = {
 };
 
 export default function PortalShell({ children }: { children: React.ReactNode }) {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'workspace=portal; path=/; SameSite=Lax';
+  }
   const [user, setUser] = useState<PortalUser | null>(null);
   const [ready, setReady] = useState(false);
   const router = useRouter();
@@ -47,7 +50,9 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   }
 
   const nav = [
+    { href: '/portal', label: 'Dashboard', exact: true },
     { href: '/portal/smart-links', label: 'Smart Links' },
+    { href: '/portal/leads', label: 'Leads' },
   ];
 
   return (
@@ -73,7 +78,9 @@ export default function PortalShell({ children }: { children: React.ReactNode })
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {nav.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

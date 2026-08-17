@@ -6,7 +6,7 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const actor = await getSmartLinkActor();
+  const actor = await getSmartLinkActor(_request);
   if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -15,7 +15,7 @@ export async function POST(
   if (!source) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  if (actor.role === 'project' && source.projectId !== actor.projectId) {
+  if (actor.role === 'project' && String(source.projectId) !== String(actor.projectId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

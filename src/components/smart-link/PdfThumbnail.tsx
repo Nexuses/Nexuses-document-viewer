@@ -1,21 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
+const PDF_OPTIONS = {
+  cMapUrl: 'https://unpkg.com/pdfjs-dist@5.4.296/cmaps/',
+  cMapPacked: true,
+};
+
 export default function PdfThumbnail({ url }: { url: string }) {
   const [failed, setFailed] = useState(false);
-  const options = useMemo(
-    () => ({
-      cMapUrl: 'https://unpkg.com/pdfjs-dist@5.4.296/cmaps/',
-      cMapPacked: true,
-    }),
-    []
-  );
 
   if (failed || !url) {
     return (
@@ -27,7 +25,7 @@ export default function PdfThumbnail({ url }: { url: string }) {
 
   return (
     <div className="h-[52px] w-[84px] shrink-0 overflow-hidden rounded-[2px] bg-white">
-      <Document file={url} options={options} loading={null} onLoadError={() => setFailed(true)}>
+      <Document file={url} options={PDF_OPTIONS} loading={null} onLoadError={() => setFailed(true)}>
         <Page pageNumber={1} width={84} renderTextLayer={false} renderAnnotationLayer={false} />
       </Document>
     </div>

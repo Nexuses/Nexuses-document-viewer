@@ -84,6 +84,17 @@ export type MasterAdminStats = {
   projects: ProjectStat[];
 };
 
+export type ProjectAdminStats = {
+  projectName: string;
+  totalSmartLinks: number;
+  publishedLinks: number;
+  draftLinks: number;
+  totalDocuments: number;
+  totalViews: number;
+  leads: number;
+  users: number;
+};
+
 export function slugify(value: string): string {
   return (
     value

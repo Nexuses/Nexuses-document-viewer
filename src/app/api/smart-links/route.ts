@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSmartLinkActor } from '@/lib/auth';
+import { getProjectById } from '@/lib/db';
 import {
   createSmartLink,
   getSmartLinks,
@@ -8,8 +9,26 @@ import {
   SmartLinkContentItem,
 } from '@/lib/smart-links';
 
-export async function GET() {
-  const actor = await getSmartLinkActor();
+async function resolveProject(
+  actor: NonNullable<Awaited<ReturnType<typeof getSmartLinkActor>>>,
+  requestedId?: string
+) {
+  if (actor.role === 'project') {
+    return { projectId: actor.projectId, projectName: actor.projectName, logoUrl: actor.logoUrl };
+  }
+  const projectId = String(requestedId || '').trim();
+  if (!projectId) {
+    return { error: 'Select a project for this Smart Link' };
+  }
+  const project = await getProjectById(projectId);
+  if (!project?._id) {
+    return { error: 'Project not found' };
+  }
+  return { projectId: project._id, projectName: project.name, logoUrl: project.logoUrl };
+}
+
+export async function GET(request: NextRequest) {
+  const actor = await getSmartLinkActor(request);
   if (!actor) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -20,7 +39,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const actor = await getSmartLinkActor();
+    const actor = await getSmartLinkActor(request);
     if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -40,11 +59,11 @@ export async function POST(request: NextRequest) {
     }
 
     const content: SmartLinkContentItem[] = Array.isArray(body.content) ? body.content : [];
-    const projectId = actor.role === 'project' ? actor.projectId : String(body.projectId || '').trim() || undefined;
-    const projectName = actor.role === 'project' ? actor.projectName : String(body.projectName || '').trim() || undefined;
-    const companyLogo =
-      String(body.companyLogo || '').trim() ||
-      (actor.role === 'project' ? actor.logoUrl || '' : '');
+    const project = await resolveProject(actor, body.projectId);
+    if ('error' in project) {
+      return NextResponse.json({ error: project.error }, { status: 400 });
+    }
+    const companyLogo = String(body.companyLogo || '').trim() || project.logoUrl || '';
 
     const created = await createSmartLink({
       title,
@@ -53,8 +72,8 @@ export async function POST(request: NextRequest) {
       companyLogo,
       slug,
       owner: actor.owner,
-      projectId,
-      projectName,
+      projectId: project.projectId,
+      projectName: project.projectName,
       status: body.status === 'published' ? 'published' : 'draft',
       content,
     });

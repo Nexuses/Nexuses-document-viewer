@@ -62,10 +62,6 @@ function itemMeta(item: SmartLinkContentItem, pages?: number) {
   return item.type;
 }
 
-function officeEmbedUrl(fileUrl: string) {
-  return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
-}
-
 function Thumbnail({ item }: { item: SmartLinkContentItem }) {
   const yt = youtubeId(item.url || item.fileUrl);
   if (item.type === 'pdf' && item.fileUrl) {
@@ -107,19 +103,19 @@ function ContentPane({
   onPagesLoaded: (count: number) => void;
 }) {
   const yt = youtubeId(item.url || item.fileUrl);
-  const pages = item.pageCount || item.slideCount || 1;
-
-  if (item.type === 'pdf' && item.fileUrl) {
-    return <SmartLinkDocumentPane url={item.fileUrl} onPagesLoaded={onPagesLoaded} />;
+  const fileUrl = item.fileUrl || item.url;
+  if ((item.type === 'pdf' || item.type === 'ppt' || item.type === 'doc') && fileUrl) {
+    return (
+      <SmartLinkDocumentPane
+        url={fileUrl}
+        kind={item.type}
+        expectedPages={item.pageCount || item.slideCount}
+        onPagesLoaded={onPagesLoaded}
+      />
+    );
   }
 
   const body = (() => {
-    if (item.type === 'ppt' && item.fileUrl) {
-      return <iframe title={itemTitle(item)} src={officeEmbedUrl(item.fileUrl)} className="h-full w-full border-0 bg-white" />;
-    }
-    if (item.type === 'doc' && item.fileUrl) {
-      return <iframe title={itemTitle(item)} src={officeEmbedUrl(item.fileUrl)} className="h-full w-full border-0 bg-white" />;
-    }
     if (yt) {
       return (
         <iframe
@@ -160,7 +156,7 @@ function ContentPane({
   return (
     <ViewerStage
       resetKey={item.id}
-      pages={pages}
+      pages={1}
       mode={item.type === 'image' ? 'fit' : 'fill'}
     >
       {body}

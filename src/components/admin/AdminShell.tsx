@@ -16,6 +16,9 @@ const nav = [
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'workspace=admin; path=/; SameSite=Lax';
+  }
   const [ready, setReady] = useState(false);
   const router = useRouter();
   const pathname = usePathname();

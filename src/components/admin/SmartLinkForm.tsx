@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   SmartLink,
   SmartLinkContentItem,
@@ -60,26 +61,54 @@ function nameFromUrl(value: string) {
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white';
 
+interface ProjectOption {
+  _id: string;
+  name: string;
+  logoUrl?: string;
+}
+
 interface Props {
   initial?: SmartLink;
   listPath?: string;
+  assignProject?: boolean;
 }
 
 export default function SmartLinkForm({
   initial,
   listPath = '/admin/dashboard/smart-links',
+  assignProject,
 }: Props) {
   const router = useRouter();
   const isEdit = Boolean(initial?._id);
+  const showProjectSelect = assignProject ?? listPath.startsWith('/admin');
   const [title, setTitle] = useState(initial?.title || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [coverImage, setCoverImage] = useState(initial?.coverImage || '');
   const [companyLogo, setCompanyLogo] = useState(initial?.companyLogo || '');
   const [slug, setSlug] = useState(initial?.slug || '');
   const [status, setStatus] = useState(initial?.status || 'draft');
+  const [projectId, setProjectId] = useState(initial?.projectId || '');
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [content, setContent] = useState<SmartLinkContentItem[]>(initial?.content || []);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmMove, setConfirmMove] = useState(false);
+
+  useEffect(() => {
+    if (!showProjectSelect) return;
+    fetch('/api/projects')
+      .then((r) => r.json())
+      .then((data) => setProjects(Array.isArray(data) ? data : []))
+      .catch(() => setProjects([]));
+  }, [showProjectSelect]);
+
+  const handleProjectChange = (id: string) => {
+    setProjectId(id);
+    const project = projects.find((item) => item._id === id);
+    if (project?.logoUrl && !companyLogo) {
+      setCompanyLogo(project.logoUrl);
+    }
+  };
 
   const updateItem = (id: string, patch: Partial<SmartLinkContentItem>) => {
     setContent((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -100,8 +129,7 @@ export default function SmartLinkForm({
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async () => {
     setError('');
     setSaving(true);
     try {
@@ -113,6 +141,7 @@ export default function SmartLinkForm({
         slug,
         status,
         content,
+        ...(showProjectSelect ? { projectId } : {}),
       };
       const response = await fetch(
         isEdit ? `/api/smart-links/${initial?._id}` : '/api/smart-links',
@@ -133,13 +162,59 @@ export default function SmartLinkForm({
       setError('An error occurred. Please try again.');
     } finally {
       setSaving(false);
+      setConfirmMove(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (showProjectSelect && !projectId) {
+      setError('Select a project for this Smart Link');
+      return;
+    }
+    const moving =
+      isEdit && showProjectSelect && Boolean(initial?.projectId) && initial?.projectId !== projectId;
+    if (moving) {
+      setConfirmMove(true);
+      return;
+    }
+    await save();
+  };
+
+  const currentProjectName =
+    projects.find((item) => item._id === initial?.projectId)?.name || initial?.projectName || 'the current project';
+  const nextProjectName = projects.find((item) => item._id === projectId)?.name || 'the selected project';
 
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl space-y-8">
       <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Smart Link details</h2>
+        {showProjectSelect && (
+          <Field label="Project">
+            <select
+              required
+              value={projectId}
+              onChange={(e) => handleProjectChange(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select project</option>
+              {projects.map((project) => (
+                <option key={project._id} value={project._id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            {projects.length === 0 ? (
+              <p className="text-xs text-gray-500 mt-1">
+                Create a project in Project & User Management first.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                A Smart Link belongs to one project. Changing this moves it out of the current project.
+              </p>
+            )}
+          </Field>
+        )}
         <Field label="Title">
           <input required value={title} onChange={(e) => handleTitle(e.target.value)} className={inputClass} />
         </Field>
@@ -328,6 +403,16 @@ export default function SmartLinkForm({
       >
         {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create Smart Link'}
       </button>
+
+      <ConfirmDialog
+        isOpen={confirmMove}
+        title="Move Smart Link"
+        message={`This Smart Link will be removed from ${currentProjectName} and assigned to ${nextProjectName}. It will only appear in that project’s admin.`}
+        confirmText="Move"
+        onConfirm={save}
+        onCancel={() => setConfirmMove(false)}
+        variant="warning"
+      />
     </form>
   );
 }

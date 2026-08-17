@@ -6,15 +6,26 @@ import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import type { SmartLink } from '@/lib/smart-link-types';
 
+type ProjectOption = { _id: string; name: string };
+
 export default function SmartLinksPage() {
   const [links, setLinks] = useState<SmartLink[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [move, setMove] = useState<{ link: SmartLink; projectId: string; projectName: string } | null>(
+    null
+  );
   const router = useRouter();
 
   const load = async () => {
-    const res = await fetch('/api/smart-links');
-    const data = await res.json();
+    const [linksRes, projectsRes] = await Promise.all([
+      fetch('/api/smart-links'),
+      fetch('/api/projects'),
+    ]);
+    const data = await linksRes.json();
+    const projectData = await projectsRes.json();
     setLinks(Array.isArray(data) ? data : []);
+    setProjects(Array.isArray(projectData) ? projectData : []);
   };
 
   useEffect(() => {
@@ -44,12 +55,25 @@ export default function SmartLinksPage() {
     load();
   };
 
+  const confirmMove = async () => {
+    if (!move?.link._id) return;
+    const res = await fetch(`/api/smart-links/${move.link._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: move.projectId }),
+    });
+    setMove(null);
+    if (res.ok) load();
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Smart Links</h1>
-          <p className="text-sm text-gray-500 mt-1">Create and manage LinkedIn Smart Links</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Assign each Smart Link to one project. Changing the project moves it out of the previous one.
+          </p>
         </div>
         <Link
           href="/admin/dashboard/smart-links/new"
@@ -81,7 +105,27 @@ export default function SmartLinksPage() {
             {links.map((link) => (
               <tr key={link._id} className="border-t border-gray-100">
                 <td className="px-4 py-3 font-medium text-gray-900">{link.title}</td>
-                <td className="px-4 py-3 text-gray-600">{link.projectName || '—'}</td>
+                <td className="px-4 py-3">
+                  <select
+                    value={link.projectId || ''}
+                    onChange={(e) => {
+                      const projectId = e.target.value;
+                      if (!projectId || projectId === link.projectId) return;
+                      const projectName = projects.find((item) => item._id === projectId)?.name || 'the selected project';
+                      setMove({ link, projectId, projectName });
+                    }}
+                    className="max-w-[180px] px-2 py-1.5 border border-gray-300 rounded-md bg-white text-gray-900"
+                  >
+                    <option value="" disabled>
+                      Select project
+                    </option>
+                    {projects.map((project) => (
+                      <option key={project._id} value={project._id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
                 <td className="px-4 py-3 text-gray-600">{link.owner}</td>
                 <td className="px-4 py-3">
                   <span
@@ -130,6 +174,15 @@ export default function SmartLinksPage() {
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}
         variant="danger"
+      />
+      <ConfirmDialog
+        isOpen={Boolean(move)}
+        title="Move Smart Link"
+        message={`This Smart Link will be removed from ${move?.link.projectName || 'its current project'} and assigned to ${move?.projectName}. It will only appear in that project’s admin.`}
+        confirmText="Move"
+        onConfirm={confirmMove}
+        onCancel={() => setMove(null)}
+        variant="warning"
       />
     </div>
   );
