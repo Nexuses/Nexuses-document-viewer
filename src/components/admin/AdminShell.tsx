@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import AdminChatbot from '@/components/admin/AdminChatbot';
 
 const LOGO =
   'https://cdn-nexlink.s3.us-east-2.amazonaws.com/Nexuses-full-logo-dark_8d412ea3-bf11-4fc6-af9c-bee7e51ef494.png';
@@ -91,6 +92,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
       <main className="flex-1 min-w-0 h-screen overflow-y-auto text-gray-900 bg-gray-50">{children}</main>
+      <AdminChatbot />
     </div>
   );
 }
