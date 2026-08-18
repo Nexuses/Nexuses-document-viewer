@@ -62,10 +62,16 @@ function itemMeta(item: SmartLinkContentItem, pages?: number) {
   return item.type;
 }
 
-function Thumbnail({ item }: { item: SmartLinkContentItem }) {
+function Thumbnail({
+  item,
+  onPagesLoaded,
+}: {
+  item: SmartLinkContentItem;
+  onPagesLoaded?: (count: number) => void;
+}) {
   const yt = youtubeId(item.url || item.fileUrl);
   if (item.type === 'pdf' && item.fileUrl) {
-    return <PdfThumbnail url={item.fileUrl} />;
+    return <PdfThumbnail url={item.fileUrl} onPagesLoaded={onPagesLoaded} />;
   }
   if (yt) {
     return (
@@ -171,6 +177,11 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const selected = items.find((i) => i.id === selectedId) || items[0];
   const ownerName = displayName(link.owner);
 
+  const rememberPages = (id: string, count: number) => {
+    if (!count) return;
+    setPageCounts((prev) => (prev[id] === count ? prev : { ...prev, [id]: count }));
+  };
+
   const download = (item: SmartLinkContentItem, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!item.fileUrl) return;
@@ -219,7 +230,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
                 className="w-full text-left flex items-center gap-3 px-2 py-[10px] mb-0.5"
                 style={{ background: active ? '#2a3b45' : 'transparent' }}
               >
-                <Thumbnail item={item} />
+                <Thumbnail item={item} onPagesLoaded={(count) => rememberPages(item.id, count)} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] leading-[1.2] truncate text-white">{itemTitle(item)}</p>
                   <p className="text-[12px] mt-1 truncate" style={{ color: '#b7c4cb' }}>
@@ -271,9 +282,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
           <ViewerErrorBoundary>
             <ContentPane
               item={selected}
-              onPagesLoaded={(count) =>
-                setPageCounts((prev) => (prev[selected.id] === count ? prev : { ...prev, [selected.id]: count }))
-              }
+              onPagesLoaded={(count) => rememberPages(selected.id, count)}
             />
           </ViewerErrorBoundary>
         ) : (

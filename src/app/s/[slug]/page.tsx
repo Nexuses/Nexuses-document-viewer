@@ -61,7 +61,11 @@ export default function PublicSmartLinkPage() {
         smartLinkTitle: link.title,
       }),
     });
-    void fetch(`/api/smart-links/public/${slug}`, { method: 'POST' });
+    void fetch(`/api/smart-links/public/${slug}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    });
   };
 
   if (missing) {

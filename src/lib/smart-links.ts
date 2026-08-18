@@ -117,6 +117,31 @@ export async function incrementSmartLinkViews(id: string): Promise<void> {
   await db.collection('smartLinks').updateOne({ _id: new ObjectId(id) }, { $inc: { views: 1 } });
 }
 
+export async function recordUniqueSmartLinkView(id: string, email: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const emailNorm = String(email || '').trim().toLowerCase();
+  if (!emailNorm) return false;
+
+  const client = await clientPromise;
+  const db = client.db('nexuses-asset');
+  const viewers = db.collection('smartLinkViewers');
+  try {
+    await viewers.createIndex({ smartLinkId: 1, email: 1 }, { unique: true });
+  } catch {
+    // index already exists
+  }
+
+  const result = await viewers.updateOne(
+    { smartLinkId: id, email: emailNorm },
+    { $setOnInsert: { smartLinkId: id, email: emailNorm, createdAt: new Date() } },
+    { upsert: true }
+  );
+
+  const uniqueViews = await viewers.countDocuments({ smartLinkId: id });
+  await db.collection('smartLinks').updateOne({ _id: new ObjectId(id) }, { $set: { views: uniqueViews } });
+  return Boolean(result.upsertedCount);
+}
+
 const DOCUMENT_TYPES = new Set(['pdf', 'ppt', 'doc']);
 
 function documentCount(content: unknown): number {
@@ -148,7 +173,7 @@ export async function getSmartLinkStats(): Promise<MasterAdminStats> {
       .toArray(),
     db
       .collection('formSubmissions')
-      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1 } })
+      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1, email: 1, name: 1 } })
       .toArray(),
   ]);
 
@@ -180,27 +205,30 @@ export async function getSmartLinkStats(): Promise<MasterAdminStats> {
     if (row) row.users += 1;
   }
 
+  const linkViewEmails = new Map<string, Set<string>>();
+  const slugToLinkId = new Map<string, string>();
+  for (const link of links) {
+    const linkId = link._id?.toString();
+    if (linkId) linkViewEmails.set(linkId, new Set());
+    if (link.slug && linkId) slugToLinkId.set(String(link.slug), linkId);
+  }
+
   const linkIdToProject = new Map<string, string>();
-  const slugToProject = new Map<string, string>();
   let publishedLinks = 0;
   let draftLinks = 0;
   let unassignedLinks = 0;
   let totalDocuments = 0;
-  let totalViews = 0;
 
   for (const link of links) {
     const projectId = String(link.projectId || '');
-    const views = Number(link.views || 0);
     const docs = documentCount(link.content);
     const published = link.status === 'published';
     totalDocuments += docs;
-    totalViews += views;
     if (published) publishedLinks += 1;
     else draftLinks += 1;
 
     const linkId = link._id?.toString();
     if (linkId) linkIdToProject.set(linkId, projectId);
-    if (link.slug) slugToProject.set(String(link.slug), projectId);
 
     const row = byProject.get(projectId);
     if (!row) {
@@ -208,23 +236,57 @@ export async function getSmartLinkStats(): Promise<MasterAdminStats> {
       continue;
     }
     row.links += 1;
-    row.views += views;
     row.documents += docs;
     if (published) row.published += 1;
     else row.drafts += 1;
   }
 
-  let leads = 0;
   for (const submission of submissions) {
-    leads += 1;
-    const fromId = submission.smartLinkId ? linkIdToProject.get(String(submission.smartLinkId)) : undefined;
-    const fromSlug = submission.smartLinkSlug
-      ? slugToProject.get(String(submission.smartLinkSlug))
-      : undefined;
-    const projectId = fromId || fromSlug || '';
-    const row = byProject.get(projectId);
-    if (row) row.leads += 1;
+    const email = String(submission.email || '').trim().toLowerCase();
+    const name = String(submission.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const fromId = submission.smartLinkId ? String(submission.smartLinkId) : '';
+    const fromSlug = submission.smartLinkSlug ? String(submission.smartLinkSlug) : '';
+    const linkId = (fromId && linkViewEmails.has(fromId) ? fromId : '') || slugToLinkId.get(fromSlug) || fromId;
+    if (!linkId) continue;
+    if (email) {
+      if (!linkViewEmails.has(linkId)) linkViewEmails.set(linkId, new Set());
+      linkViewEmails.get(linkId)!.add(email);
+    }
   }
+
+  let totalViews = 0;
+  let leads = 0;
+  const globalLeadKeys = new Set<string>();
+  const projectLeadKeys = new Map<string, Set<string>>();
+
+  linkViewEmails.forEach((emails, linkId) => {
+    const views = emails.size;
+    totalViews += views;
+    const projectId = linkIdToProject.get(linkId);
+    const row = projectId ? byProject.get(projectId) : undefined;
+    if (row) row.views += views;
+  });
+
+  for (const submission of submissions) {
+    const email = String(submission.email || '').trim().toLowerCase();
+    const name = String(submission.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    if (!email || !name) continue;
+    const person = `${email}::${name}`;
+    globalLeadKeys.add(person);
+    const fromId = submission.smartLinkId ? String(submission.smartLinkId) : '';
+    const fromSlug = submission.smartLinkSlug ? String(submission.smartLinkSlug) : '';
+    const linkId = (fromId && linkIdToProject.has(fromId) ? fromId : '') || slugToLinkId.get(fromSlug) || '';
+    const projectId = linkId ? linkIdToProject.get(linkId) : undefined;
+    if (projectId) {
+      if (!projectLeadKeys.has(projectId)) projectLeadKeys.set(projectId, new Set());
+      projectLeadKeys.get(projectId)!.add(person);
+    }
+  }
+  leads = globalLeadKeys.size;
+  projectLeadKeys.forEach((keys, projectId) => {
+    const row = byProject.get(projectId);
+    if (row) row.leads = keys.size;
+  });
 
   return {
     totalProjects: projects.length,
@@ -265,7 +327,7 @@ export async function getProjectAdminStats(projectId: string): Promise<ProjectAd
       .toArray(),
     db
       .collection('formSubmissions')
-      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1 } })
+      .find({}, { projection: { smartLinkId: 1, smartLinkSlug: 1, email: 1, name: 1 } })
       .toArray(),
   ]);
 
@@ -275,20 +337,34 @@ export async function getProjectAdminStats(projectId: string): Promise<ProjectAd
   let publishedLinks = 0;
   let draftLinks = 0;
   let totalDocuments = 0;
-  let totalViews = 0;
   for (const link of links) {
     const published = link.status === 'published';
     if (published) publishedLinks += 1;
     else draftLinks += 1;
     totalDocuments += documentCount(link.content);
-    totalViews += Number(link.views || 0);
   }
 
-  const leads = submissions.filter((submission) => {
+  const viewEmails = new Map<string, Set<string>>();
+  const leadKeys = new Set<string>();
+  for (const submission of submissions) {
     const id = submission.smartLinkId ? String(submission.smartLinkId) : '';
     const slug = submission.smartLinkSlug ? String(submission.smartLinkSlug) : '';
-    return (id && linkIds.has(id)) || (slug && slugs.has(slug));
-  }).length;
+    const linkId = (id && linkIds.has(id) ? id : '') || (slug && slugs.has(slug) ? slug : '');
+    if (!((id && linkIds.has(id)) || (slug && slugs.has(slug)))) continue;
+    const email = String(submission.email || '').trim().toLowerCase();
+    const name = String(submission.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const key = id || slug;
+    if (email && key) {
+      if (!viewEmails.has(key)) viewEmails.set(key, new Set());
+      viewEmails.get(key)!.add(email);
+    }
+    if (email && name) leadKeys.add(`${email}::${name}`);
+  }
+
+  let totalViews = 0;
+  viewEmails.forEach((emails) => {
+    totalViews += emails.size;
+  });
 
   return {
     projectName: project?.name ? String(project.name) : '',
@@ -297,7 +373,7 @@ export async function getProjectAdminStats(projectId: string): Promise<ProjectAd
     draftLinks,
     totalDocuments,
     totalViews,
-    leads,
+    leads: leadKeys.size,
     users,
   };
 }

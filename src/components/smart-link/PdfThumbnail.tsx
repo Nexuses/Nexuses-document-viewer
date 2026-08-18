@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 
 if (typeof window !== 'undefined') {
@@ -12,8 +12,16 @@ const PDF_OPTIONS = {
   cMapPacked: true,
 };
 
-export default function PdfThumbnail({ url }: { url: string }) {
+export default function PdfThumbnail({
+  url,
+  onPagesLoaded,
+}: {
+  url: string;
+  onPagesLoaded?: (count: number) => void;
+}) {
   const [failed, setFailed] = useState(false);
+  const onPagesLoadedRef = useRef(onPagesLoaded);
+  onPagesLoadedRef.current = onPagesLoaded;
 
   if (failed || !url) {
     return (
@@ -25,7 +33,13 @@ export default function PdfThumbnail({ url }: { url: string }) {
 
   return (
     <div className="h-[52px] w-[84px] shrink-0 overflow-hidden rounded-[2px] bg-white">
-      <Document file={url} options={PDF_OPTIONS} loading={null} onLoadError={() => setFailed(true)}>
+      <Document
+        file={url}
+        options={PDF_OPTIONS}
+        loading={null}
+        onLoadSuccess={({ numPages }) => onPagesLoadedRef.current?.(numPages)}
+        onLoadError={() => setFailed(true)}
+      >
         <Page pageNumber={1} width={84} renderTextLayer={false} renderAnnotationLayer={false} />
       </Document>
     </div>

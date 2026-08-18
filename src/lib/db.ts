@@ -23,11 +23,21 @@ export interface FormSubmission {
   _id?: string;
   email: string;
   name: string;
+  emailNorm?: string;
+  nameNorm?: string;
   sessionId?: string;
   smartLinkId?: string;
   smartLinkSlug?: string;
   smartLinkTitle?: string;
   createdAt?: Date;
+}
+
+export function normalizeEmail(email: string): string {
+  return String(email || '').trim().toLowerCase();
+}
+
+export function normalizePersonName(name: string): string {
+  return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 export async function getAssets(): Promise<Asset[]> {
@@ -200,13 +210,45 @@ export async function createFormSubmission(
 ): Promise<FormSubmission> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
+  const emailNorm = normalizeEmail(submission.email);
+  const nameNorm = normalizePersonName(submission.name);
+  const linkFilter: Record<string, unknown> = {};
+  if (submission.smartLinkId) linkFilter.smartLinkId = submission.smartLinkId;
+  else if (submission.smartLinkSlug) linkFilter.smartLinkSlug = submission.smartLinkSlug;
+
+  if (Object.keys(linkFilter).length > 0 && emailNorm && nameNorm) {
+    const existing = await db.collection<FormSubmission>('formSubmissions').findOne({
+      ...linkFilter,
+      $or: [
+        { emailNorm, nameNorm },
+        { email: emailNorm, name: submission.name.trim() },
+      ],
+    });
+    if (existing) {
+      return { ...existing, _id: existing._id?.toString() };
+    }
+    const sameLink = await db.collection<FormSubmission>('formSubmissions').find(linkFilter).toArray();
+    const duplicate = sameLink.find(
+      (item) =>
+        normalizeEmail(item.email) === emailNorm && normalizePersonName(item.name) === nameNorm
+    );
+    if (duplicate) {
+      return { ...duplicate, _id: duplicate._id?.toString() };
+    }
+  }
+
   const now = new Date();
-  const result = await db.collection<FormSubmission>('formSubmissions').insertOne({
+  const doc = {
     ...submission,
+    email: emailNorm || submission.email,
+    name: submission.name.trim(),
+    emailNorm,
+    nameNorm,
     createdAt: now,
-  });
+  };
+  const result = await db.collection<FormSubmission>('formSubmissions').insertOne(doc);
   return {
-    ...submission,
+    ...doc,
     _id: result.insertedId.toString(),
     createdAt: now,
   };
@@ -224,6 +266,20 @@ export async function getFormSubmissions(): Promise<FormSubmission[]> {
     ...submission,
     _id: submission._id?.toString(),
   }));
+}
+
+export function uniqueLeads<T extends { email?: string; name?: string; smartLinkId?: string; smartLinkSlug?: string }>(
+  submissions: T[]
+): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const submission of submissions) {
+    const key = [normalizeEmail(submission.email || ''), normalizePersonName(submission.name || '')].join('::');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(submission);
+  }
+  return unique;
 }
 
 export async function deleteFormSubmission(id: string): Promise<boolean> {

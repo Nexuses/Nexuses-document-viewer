@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createFormSubmission, getFormSubmissions, deleteFormSubmission } from '@/lib/db';
+import { createFormSubmission, getFormSubmissions, deleteFormSubmission, uniqueLeads } from '@/lib/db';
 import { getSession, getSmartLinkActor } from '@/lib/auth';
 import { getSmartLinks } from '@/lib/smart-links';
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const submissions = await getFormSubmissions();
     if (actor.role === 'master') {
-      return NextResponse.json(submissions);
+      return NextResponse.json(uniqueLeads(submissions));
     }
 
     const links = await getSmartLinks(actor.projectId);
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       const slug = submission.smartLinkSlug || '';
       return (id && ids.has(id)) || (slug && slugs.has(slug));
     });
-    return NextResponse.json(scoped);
+    return NextResponse.json(uniqueLeads(scoped));
   } catch (error) {
     console.error('Error fetching form submissions:', error);
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSmartLinkBySlug, incrementSmartLinkViews } from '@/lib/smart-links';
+import { getSmartLinkBySlug, recordUniqueSmartLinkView } from '@/lib/smart-links';
 
 export async function GET(
   _request: NextRequest,
@@ -14,7 +14,7 @@ export async function GET(
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
@@ -22,6 +22,8 @@ export async function POST(
   if (!link?._id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  await incrementSmartLinkViews(link._id);
-  return NextResponse.json({ success: true });
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email || '').trim();
+  const counted = await recordUniqueSmartLinkView(link._id, email);
+  return NextResponse.json({ success: true, counted });
 }

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createFormSubmission } from '@/lib/db';
-import { getSmartLinkBySlug, incrementSmartLinkViews } from '@/lib/smart-links';
+import { getSmartLinkBySlug, recordUniqueSmartLinkView } from '@/lib/smart-links';
 
 export async function agreeAndView(formData: FormData) {
   const slug = String(formData.get('slug') || '');
@@ -24,7 +24,7 @@ export async function agreeAndView(formData: FormData) {
         smartLinkSlug: slug,
         smartLinkTitle: link.title,
       });
-      await incrementSmartLinkViews(link._id);
+      await recordUniqueSmartLinkView(link._id, email);
     } catch (error) {
       console.error('agreeAndView save failed', error);
     }
