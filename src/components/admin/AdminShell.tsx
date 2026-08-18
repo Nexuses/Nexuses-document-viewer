@@ -12,6 +12,7 @@ const nav = [
   { href: '/admin/dashboard', label: 'Dashboard', exact: true },
   { href: '/admin/dashboard/smart-links', label: 'Smart Links' },
   { href: '/admin/dashboard/projects', label: 'Project & User Management' },
+  { href: '/admin/dashboard/analytics', label: 'Analytics' },
   { href: '/admin/dashboard/submissions', label: 'Leads' },
 ];
 

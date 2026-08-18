@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAnalyticsEvent, getAnalytics, getAnalyticsSummary, getUserSessions, deleteUserSession } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { resolveEventGeo } from '@/lib/geo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,8 +54,16 @@ export async function POST(request: NextRequest) {
       action,
       assetId,
       assetTitle,
+      smartLinkId,
+      smartLinkSlug,
+      smartLinkTitle,
       timeSpent,
       userAgent,
+      email,
+      country: clientCountry,
+      countryCode: clientCountryCode,
+      region: clientRegion,
+      city: clientCity,
     } = body;
 
     if (!sessionId || !action) {
@@ -64,19 +73,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get IP address from request
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown';
+    const geo = await resolveEventGeo(request.headers, {
+      country: clientCountry,
+      countryCode: clientCountryCode,
+      region: clientRegion,
+      city: clientCity,
+    });
 
     const analytics = await createAnalyticsEvent({
       sessionId,
       action,
       assetId,
       assetTitle,
+      smartLinkId,
+      smartLinkSlug,
+      smartLinkTitle,
       timeSpent,
+      email,
       userAgent: userAgent || request.headers.get('user-agent') || 'unknown',
-      ipAddress: ipAddress.toString(),
+      ipAddress: geo.ipAddress,
+      country: geo.country,
+      countryCode: geo.countryCode,
+      region: geo.region,
+      city: geo.city,
     });
 
     return NextResponse.json(analytics, { status: 201 });

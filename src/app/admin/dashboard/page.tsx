@@ -35,7 +35,7 @@ export default function DashboardPage() {
     { label: 'Published', value: stats?.publishedLinks ?? '—', href: '/admin/dashboard/smart-links' },
     { label: 'Drafts', value: stats?.draftLinks ?? '—', href: '/admin/dashboard/smart-links' },
     { label: 'Documents', value: stats?.totalDocuments ?? '—', href: '/admin/dashboard/smart-links' },
-    { label: 'Total Views', value: stats?.totalViews ?? '—', href: '/admin/dashboard/smart-links' },
+    { label: 'Total Views', value: stats?.totalViews ?? '—', href: '/admin/dashboard/analytics' },
   ];
 
   return (

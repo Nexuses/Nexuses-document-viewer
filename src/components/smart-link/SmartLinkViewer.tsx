@@ -1,7 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useClientGeo } from '@/hooks/useClientGeo';
+import { getClientGeo } from '@/lib/geo';
 import { getDocumentPageCount, resolveMediaUrl } from '@/lib/document-meta';
 import type { SmartLink, SmartLinkContentItem } from '@/lib/smart-link-types';
 import ViewerErrorBoundary from './ViewerErrorBoundary';
@@ -271,6 +273,107 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
   const selected = items.find((i) => i.id === selectedId) || items[0];
   const ownerName = displayName(link.owner);
+  const geoRef = useClientGeo();
+  const sessionIdRef = useRef('');
+  const lastViewRef = useRef<number | null>(null);
+  const openedRef = useRef(false);
+  const prevSelectedIdRef = useRef<string | undefined>(undefined);
+
+  const trackEvent = useCallback(
+    async (
+      action: 'smart_link_view' | 'content_view' | 'session_end' | 'download',
+      item?: SmartLinkContentItem,
+      timeSpent?: number
+    ) => {
+      const sessionId =
+        sessionIdRef.current ||
+        (typeof window !== 'undefined' ? window.localStorage.getItem('smart-link-session') : null);
+      if (!sessionId) return;
+      sessionIdRef.current = sessionId;
+      const geo =
+        geoRef.current.country || geoRef.current.countryCode
+          ? geoRef.current
+          : await getClientGeo();
+      geoRef.current = geo;
+      try {
+        await fetch('/api/analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            action,
+            assetId: item?.id,
+            assetTitle: item ? itemTitle(item) : undefined,
+            smartLinkId: link._id,
+            smartLinkSlug: link.slug,
+            smartLinkTitle: link.title,
+            timeSpent,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+            country: geo.country,
+            countryCode: geo.countryCode,
+            region: geo.region,
+            city: geo.city,
+          }),
+        });
+      } catch {
+        // ignore tracking failures
+      }
+    },
+    [link._id, link.slug, link.title]
+  );
+
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    void trackEvent('smart_link_view');
+    lastViewRef.current = Date.now();
+  }, [trackEvent]);
+
+  useEffect(() => {
+    if (!selected) return;
+    if (prevSelectedIdRef.current && lastViewRef.current) {
+      const timeSpent = Math.floor((Date.now() - lastViewRef.current) / 1000);
+      if (timeSpent > 0) void trackEvent('session_end', undefined, timeSpent);
+    }
+    void trackEvent('content_view', selected);
+    prevSelectedIdRef.current = selected.id;
+    lastViewRef.current = Date.now();
+  }, [selected?.id, trackEvent, selected]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (!lastViewRef.current) return;
+      const timeSpent = Math.floor((Date.now() - lastViewRef.current) / 1000);
+      if (timeSpent <= 0) return;
+      const sessionId = sessionIdRef.current || window.localStorage.getItem('smart-link-session');
+      if (!sessionId) return;
+      const blob = new Blob(
+        [
+          JSON.stringify({
+            sessionId,
+            action: 'session_end',
+            timeSpent,
+            smartLinkId: link._id,
+            smartLinkSlug: link.slug,
+            smartLinkTitle: link.title,
+            userAgent: navigator.userAgent,
+            country: geoRef.current.country,
+            countryCode: geoRef.current.countryCode,
+            region: geoRef.current.region,
+            city: geoRef.current.city,
+          }),
+        ],
+        { type: 'application/json' }
+      );
+      navigator.sendBeacon('/api/analytics', blob);
+    };
+
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, [link._id, link.slug, link.title]);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +397,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const download = (item: SmartLinkContentItem, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!item.fileUrl) return;
+    void trackEvent('download', item);
     const a = document.createElement('a');
     a.href = item.fileUrl;
     a.download = item.fileName || 'download';

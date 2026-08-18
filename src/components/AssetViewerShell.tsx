@@ -6,6 +6,8 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import ContactFormModal from '@/components/ContactFormModal';
 import ShareButton from '@/components/ShareButton';
+import { useClientGeo } from '@/hooks/useClientGeo';
+import { getClientGeo } from '@/lib/geo';
 
 const PDFViewer = dynamic(() => import('@/components/PDFViewer'), { ssr: false });
 
@@ -44,6 +46,7 @@ export default function AssetViewerShell({ activeAssetId }: { activeAssetId?: st
   });
 
   const [lastAssetViewTime, setLastAssetViewTime] = useState<number | null>(null);
+  const geoRef = useClientGeo();
 
   useEffect(() => {
     fetchAssets();
@@ -164,18 +167,25 @@ export default function AssetViewerShell({ activeAssetId }: { activeAssetId?: st
       if (lastAssetViewTime && sessionId && formSubmitted) {
         const timeSpent = Math.floor((Date.now() - lastAssetViewTime) / 1000);
         if (timeSpent > 0) {
-          const blob = new Blob(
-            [
-              JSON.stringify({
-                sessionId,
-                action: 'session_end',
-                timeSpent,
-                userAgent: navigator.userAgent,
-              }),
-            ],
-            { type: 'application/json' }
-          );
-          navigator.sendBeacon('/api/analytics', blob);
+          void getClientGeo().then((geo) => {
+            geoRef.current = geo;
+            const blob = new Blob(
+              [
+                JSON.stringify({
+                  sessionId,
+                  action: 'session_end',
+                  timeSpent,
+                  userAgent: navigator.userAgent,
+                  country: geo.country,
+                  countryCode: geo.countryCode,
+                  region: geo.region,
+                  city: geo.city,
+                }),
+              ],
+              { type: 'application/json' }
+            );
+            navigator.sendBeacon('/api/analytics', blob);
+          });
         }
       }
     };
@@ -200,6 +210,11 @@ export default function AssetViewerShell({ activeAssetId }: { activeAssetId?: st
     timeSpent?: number
   ) => {
     try {
+      const geo =
+        geoRef.current.country || geoRef.current.countryCode
+          ? geoRef.current
+          : await getClientGeo();
+      geoRef.current = geo;
       await fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,6 +225,10 @@ export default function AssetViewerShell({ activeAssetId }: { activeAssetId?: st
           assetTitle,
           timeSpent,
           userAgent: typeof window !== 'undefined' ? navigator.userAgent : undefined,
+          country: geo.country,
+          countryCode: geo.countryCode,
+          region: geo.region,
+          city: geo.city,
         }),
       });
     } catch (error) {

@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface AnalyticsSummary {
@@ -10,9 +8,21 @@ interface AnalyticsSummary {
   totalPageViews: number;
   totalDownloads: number;
   totalTimeSpent: number;
+  totalLeads: number;
+  totalSmartLinkViews: number;
+  uniqueCountries: number;
+  averageSessionTime: number;
+  viewsByCountry: {
+    country: string;
+    countryCode?: string;
+    sessions: number;
+    pageViews: number;
+    totalTimeSpent: number;
+    averageTimeSpent: number;
+  }[];
   mostViewedAssets: { assetId: string; assetTitle: string; views: number }[];
   mostDownloadedAssets: { assetId: string; assetTitle: string; downloads: number }[];
-  averageSessionTime: number;
+  mostViewedSmartLinks: { smartLinkId: string; smartLinkTitle: string; views: number }[];
 }
 
 interface UserSession {
@@ -21,6 +31,12 @@ interface UserSession {
   userAgent: string;
   email?: string;
   companyName?: string;
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
+  smartLinkTitle?: string;
+  smartLinkSlug?: string;
   startTime: string;
   endTime?: string;
   totalTimeSpent: number;
@@ -28,39 +44,39 @@ interface UserSession {
   downloads: { assetId: string; assetTitle: string; timestamp: string }[];
 }
 
+type Tab = 'overview' | 'countries' | 'sessions' | 'content';
+
+function formatTime(seconds: number) {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}m ${secs}s`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
+}
+
+function formatDate(dateString: string) {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleString();
+}
+
+function locationLabel(session: Pick<UserSession, 'city' | 'region' | 'country' | 'countryCode'>) {
+  const parts = [session.city, session.region, session.country || session.countryCode].filter(Boolean);
+  return parts.length ? parts.join(', ') : 'Unknown';
+}
+
 export default function AnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState<'summary' | 'users'>('summary');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; sessionId: string | null }>({
     isOpen: false,
     sessionId: null,
   });
-  const router = useRouter();
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/check');
-      const data = await response.json();
-      if (data.authenticated) {
-        setAuthenticated(true);
-        fetchAnalytics();
-      } else {
-        router.push('/admin/login');
-      }
-    } catch (err) {
-      router.push('/admin/login');
-    } finally {
-      setCheckingAuth(false);
-    }
-  };
 
   const fetchAnalytics = async () => {
     try {
@@ -68,16 +84,9 @@ export default function AnalyticsPage() {
         fetch('/api/analytics?summary=true'),
         fetch('/api/analytics?sessions=true'),
       ]);
-      
-      if (summaryResponse.ok) {
-        const summaryData = await summaryResponse.json();
-        setSummary(summaryData);
-      }
-      
-      if (sessionsResponse.ok) {
-        const sessionsData = await sessionsResponse.json();
-        setUserSessions(sessionsData);
-      }
+
+      if (summaryResponse.ok) setSummary(await summaryResponse.json());
+      if (sessionsResponse.ok) setUserSessions(await sessionsResponse.json());
     } catch (err) {
       console.error('Error fetching analytics:', err);
     } finally {
@@ -85,322 +94,290 @@ export default function AnalyticsPage() {
     }
   };
 
-  const formatTime = (seconds: number) => {
-    if (seconds < 60) {
-      return `${Math.round(seconds)}s`;
-    } else if (seconds < 3600) {
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.round(seconds % 60);
-      return `${mins}m ${secs}s`;
-    } else {
-      const hours = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      return `${hours}h ${mins}m`;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
-  };
-
-  const handleDeleteClick = (sessionId: string) => {
-    setDeleteDialog({ isOpen: true, sessionId });
-  };
+  useEffect(() => {
+    void fetchAnalytics();
+  }, []);
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.sessionId) return;
-
     try {
       const response = await fetch(`/api/analytics?sessionId=${encodeURIComponent(deleteDialog.sessionId)}`, {
         method: 'DELETE',
       });
-
       if (response.ok) {
-        setUserSessions(userSessions.filter(session => session.sessionId !== deleteDialog.sessionId));
-        const summaryResponse = await fetch('/api/analytics?summary=true');
-        if (summaryResponse.ok) {
-          const summaryData = await summaryResponse.json();
-          setSummary(summaryData);
-        }
-        setDeleteDialog({ isOpen: false, sessionId: null });
-      } else {
-        alert('Failed to delete session. Please try again.');
-        setDeleteDialog({ isOpen: false, sessionId: null });
+        setUserSessions((prev) => prev.filter((session) => session.sessionId !== deleteDialog.sessionId));
+        await fetchAnalytics();
       }
-    } catch (err) {
-      console.error('Error deleting session:', err);
-      alert('An error occurred while deleting the session.');
+    } finally {
       setDeleteDialog({ isOpen: false, sessionId: null });
     }
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div>Loading...</div>
-      </div>
-    );
-  }
-
-  if (!authenticated) {
-    return null;
-  }
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'countries', label: 'Countries' },
+    { id: 'sessions', label: `Sessions (${userSessions.length})` },
+    { id: 'content', label: 'Content' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <Link
-            href="/admin/dashboard"
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            Back to Dashboard
-          </Link>
-        </div>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Visitor locations, time spent, smart link engagement, and content performance
+        </p>
+      </div>
 
-        {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex flex-wrap gap-6">
+          {tabs.map((tab) => (
             <button
-              onClick={() => setActiveTab('summary')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'summary'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-3 border-b-2 text-sm font-medium ${
+                activeTab === tab.id
+                  ? 'border-[#120C29] text-[#120C29]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Summary
+              {tab.label}
             </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'users'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              User Sessions ({userSessions.length})
-            </button>
-          </nav>
-        </div>
+          ))}
+        </nav>
+      </div>
 
-        {loading ? (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-600">Loading analytics...</p>
-          </div>
-        ) : activeTab === 'users' ? (
-          <div className="space-y-6">
-            {userSessions.length === 0 ? (
-              <div className="bg-white p-8 rounded-lg shadow-md text-center">
-                <p className="text-gray-600">No user sessions recorded yet.</p>
-              </div>
-            ) : (
-              userSessions.map((session) => (
-                <div key={session.sessionId} className="bg-white p-6 rounded-lg shadow-md">
-                  <div className="flex flex-wrap items-start justify-between mb-4 pb-4 border-b border-gray-200">
-                    <div className="flex-1 min-w-[200px] mb-4 md:mb-0">
-                      <div className="mb-3">
-                        {session.email ? (
-                          <h3 className="text-xl font-bold text-blue-600 mb-1">
-                            {session.email}
-                          </h3>
-                        ) : (
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                            Session: {session.sessionId.substring(0, 20)}...
-                          </h3>
-                        )}
-                        {session.companyName && (
-                          <p className="text-base font-medium text-gray-700 mb-2">
-                            Company: {session.companyName}
-                          </p>
-                        )}
-                        {!session.email && (
-                          <p className="text-sm text-gray-500 italic">
-                            (No email - form not submitted)
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p><span className="font-medium">Session ID:</span> {session.sessionId.substring(0, 30)}...</p>
-                        <p><span className="font-medium">IP Address:</span> {session.ipAddress}</p>
-                        <p><span className="font-medium">Device:</span> {session.userAgent.substring(0, 80)}...</p>
-                        <p><span className="font-medium">Start Time:</span> {formatDate(session.startTime)}</p>
-                        {session.endTime && (
-                          <p><span className="font-medium">End Time:</span> {formatDate(session.endTime)}</p>
-                        )}
-                        <p><span className="font-medium">Time Spent:</span> {formatTime(session.totalTimeSpent)}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteClick(session.sessionId)}
-                      className="ml-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium whitespace-nowrap"
-                      title="Delete this session"
-                    >
-                      Delete
-                    </button>
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-500">Loading analytics...</div>
+      ) : !summary ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-500">No analytics data yet.</div>
+      ) : (
+        <>
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                {[
+                  { label: 'Sessions', value: summary.totalSessions },
+                  { label: 'Page Views', value: summary.totalPageViews },
+                  { label: 'Leads', value: summary.totalLeads },
+                  { label: 'Countries', value: summary.uniqueCountries },
+                  { label: 'Smart Link Opens', value: summary.totalSmartLinkViews },
+                  { label: 'Downloads', value: summary.totalDownloads },
+                  { label: 'Total Time', value: formatTime(summary.totalTimeSpent) },
+                  { label: 'Avg Session Time', value: formatTime(summary.averageSessionTime) },
+                ].map((card) => (
+                  <div key={card.label} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                    <p className="text-sm text-gray-500">{card.label}</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{card.value}</p>
                   </div>
+                ))}
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Pages Visited */}
-                    <div>
-                      <h4 className="text-md font-semibold text-gray-900 mb-3">
-                        Pages Visited ({session.pagesVisited.length})
-                      </h4>
-                      {session.pagesVisited.length === 0 ? (
-                        <p className="text-sm text-gray-500">No pages visited</p>
-                      ) : (
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Top Countries</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-left text-gray-600">
+                      <tr>
+                        <th className="px-6 py-3 font-medium">Country</th>
+                        <th className="px-6 py-3 font-medium">Sessions</th>
+                        <th className="px-6 py-3 font-medium">Page Views</th>
+                        <th className="px-6 py-3 font-medium">Total Time</th>
+                        <th className="px-6 py-3 font-medium">Avg Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.viewsByCountry.slice(0, 8).map((row) => (
+                        <tr key={`${row.country}-${row.countryCode || 'na'}`} className="border-t border-gray-100">
+                          <td className="px-6 py-3 font-medium text-gray-900">
+                            {row.countryCode ? `${row.country} (${row.countryCode})` : row.country}
+                          </td>
+                          <td className="px-6 py-3 text-gray-700">{row.sessions}</td>
+                          <td className="px-6 py-3 text-gray-700">{row.pageViews}</td>
+                          <td className="px-6 py-3 text-gray-700">{formatTime(row.totalTimeSpent)}</td>
+                          <td className="px-6 py-3 text-gray-700">{formatTime(row.averageTimeSpent)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'countries' && (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-gray-600">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">Country</th>
+                      <th className="px-6 py-3 font-medium">Sessions</th>
+                      <th className="px-6 py-3 font-medium">Page Views</th>
+                      <th className="px-6 py-3 font-medium">Total Time Spent</th>
+                      <th className="px-6 py-3 font-medium">Avg Time / Session</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.viewsByCountry.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                          No location data recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      summary.viewsByCountry.map((row) => (
+                        <tr key={`${row.country}-${row.countryCode || 'na'}`} className="border-t border-gray-100">
+                          <td className="px-6 py-3 font-medium text-gray-900">
+                            {row.countryCode ? `${row.country} (${row.countryCode})` : row.country}
+                          </td>
+                          <td className="px-6 py-3 text-gray-700">{row.sessions}</td>
+                          <td className="px-6 py-3 text-gray-700">{row.pageViews}</td>
+                          <td className="px-6 py-3 text-gray-700">{formatTime(row.totalTimeSpent)}</td>
+                          <td className="px-6 py-3 text-gray-700">{formatTime(row.averageTimeSpent)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'sessions' && (
+            <div className="space-y-4">
+              {userSessions.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-500">
+                  No sessions recorded yet.
+                </div>
+              ) : (
+                userSessions.map((session) => (
+                  <div key={session.sessionId} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-4 mb-4 pb-4 border-b border-gray-100">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {session.email || `Session ${session.sessionId.slice(0, 12)}...`}
+                        </h3>
+                        {session.smartLinkTitle && (
+                          <p className="text-sm text-gray-600 mt-1">Smart Link: {session.smartLinkTitle}</p>
+                        )}
+                        <div className="mt-3 space-y-1 text-sm text-gray-600">
+                          <p><span className="font-medium text-gray-800">Location:</span> {locationLabel(session)}</p>
+                          <p><span className="font-medium text-gray-800">IP:</span> {session.ipAddress}</p>
+                          <p><span className="font-medium text-gray-800">Started:</span> {formatDate(session.startTime)}</p>
+                          {session.endTime && (
+                            <p><span className="font-medium text-gray-800">Ended:</span> {formatDate(session.endTime)}</p>
+                          )}
+                          <p><span className="font-medium text-gray-800">Time Spent:</span> {formatTime(session.totalTimeSpent)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteDialog({ isOpen: true, sessionId: session.sessionId })}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-semibold text-gray-900 mb-2">Pages Viewed ({session.pagesVisited.length})</h4>
                         <div className="space-y-2">
                           {session.pagesVisited.map((page, index) => (
-                            <div key={index} className="text-sm bg-gray-50 p-2 rounded">
+                            <div key={`${page.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3">
                               <p className="font-medium text-gray-900">{page.assetTitle}</p>
-                              <p className="text-xs text-gray-500">{formatDate(page.timestamp)}</p>
+                              <p className="text-xs text-gray-500 mt-1">{formatDate(page.timestamp)}</p>
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-
-                    {/* Downloads */}
-                    <div>
-                      <h4 className="text-md font-semibold text-gray-900 mb-3">
-                        Downloads ({session.downloads.length})
-                      </h4>
-                      {session.downloads.length === 0 ? (
-                        <p className="text-sm text-gray-500">No downloads</p>
-                      ) : (
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 mb-2">Downloads ({session.downloads.length})</h4>
                         <div className="space-y-2">
-                          {session.downloads.map((download, index) => (
-                            <div key={index} className="text-sm bg-gray-50 p-2 rounded">
-                              <p className="font-medium text-gray-900">{download.assetTitle}</p>
-                              <p className="text-xs text-gray-500">{formatDate(download.timestamp)}</p>
-                            </div>
-                          ))}
+                          {session.downloads.length === 0 ? (
+                            <p className="text-sm text-gray-500">No downloads</p>
+                          ) : (
+                            session.downloads.map((download, index) => (
+                              <div key={`${download.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3">
+                                <p className="font-medium text-gray-900">{download.assetTitle}</p>
+                                <p className="text-xs text-gray-500 mt-1">{formatDate(download.timestamp)}</p>
+                              </div>
+                            ))
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : !summary ? (
-          <div className="bg-white p-8 rounded-lg shadow-md text-center">
-            <p className="text-gray-600">No analytics data available yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Sessions</h3>
-                <p className="text-3xl font-bold text-gray-900">{summary.totalSessions}</p>
-              </div>
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Page Views</h3>
-                <p className="text-3xl font-bold text-gray-900">{summary.totalPageViews}</p>
-              </div>
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Downloads</h3>
-                <p className="text-3xl font-bold text-gray-900">{summary.totalDownloads}</p>
-              </div>
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Total Time Spent</h3>
-                <p className="text-3xl font-bold text-gray-900">{formatTime(summary.totalTimeSpent)}</p>
-              </div>
-            </div>
-
-            {/* Average Session Time */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Average Session Time</h3>
-              <p className="text-2xl font-bold text-blue-600">{formatTime(summary.averageSessionTime)}</p>
-            </div>
-
-            {/* Most Viewed Assets */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Most Viewed Assets</h3>
-              {summary.mostViewedAssets.length === 0 ? (
-                <p className="text-gray-500">No views recorded yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Rank
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Asset Title
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Views
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {summary.mostViewedAssets.map((asset, index) => (
-                        <tr key={asset.assetId} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            #{index + 1}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {asset.assetTitle}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {asset.views}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                ))
               )}
             </div>
+          )}
 
-            {/* Most Downloaded Assets */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Most Downloaded Assets</h3>
-              {summary.mostDownloadedAssets.length === 0 ? (
-                <p className="text-gray-500">No downloads recorded yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Rank
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Asset Title
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Downloads
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {summary.mostDownloadedAssets.map((asset, index) => (
-                        <tr key={asset.assetId} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            #{index + 1}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {asset.assetTitle}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {asset.downloads}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {activeTab === 'content' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Most Viewed Smart Links</h2>
                 </div>
-              )}
+                <div className="divide-y divide-gray-100">
+                  {summary.mostViewedSmartLinks.length === 0 ? (
+                    <p className="px-6 py-8 text-sm text-gray-500">No smart link views yet.</p>
+                  ) : (
+                    summary.mostViewedSmartLinks.map((link, index) => (
+                      <div key={link.smartLinkId} className="px-6 py-4 flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">#{index + 1} {link.smartLinkTitle}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700">{link.views} opens</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Most Viewed Assets</h2>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {summary.mostViewedAssets.length === 0 ? (
+                    <p className="px-6 py-8 text-sm text-gray-500">No asset views yet.</p>
+                  ) : (
+                    summary.mostViewedAssets.map((asset, index) => (
+                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between">
+                        <p className="font-medium text-gray-900">#{index + 1} {asset.assetTitle}</p>
+                        <p className="text-sm font-semibold text-gray-700">{asset.views} views</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden xl:col-span-2">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Most Downloaded Assets</h2>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {summary.mostDownloadedAssets.length === 0 ? (
+                    <p className="px-6 py-8 text-sm text-gray-500">No downloads yet.</p>
+                  ) : (
+                    summary.mostDownloadedAssets.map((asset, index) => (
+                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between">
+                        <p className="font-medium text-gray-900">#{index + 1} {asset.assetTitle}</p>
+                        <p className="text-sm font-semibold text-gray-700">{asset.downloads} downloads</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
 
       <ConfirmDialog
         isOpen={deleteDialog.isOpen}
@@ -415,4 +392,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
 import clientPromise from './mongodb';
 import { ObjectId } from 'mongodb';
+import { lookupGeoFromStoredIp, type GeoLocation } from './geo';
 
 export interface Asset {
   _id?: string;
@@ -297,14 +298,27 @@ export async function deleteFormSubmission(id: string): Promise<boolean> {
 export interface Analytics {
   _id?: string;
   sessionId: string;
-  action: 'page_view' | 'download' | 'session_end' | 'form_submitted';
+  action:
+    | 'page_view'
+    | 'download'
+    | 'session_end'
+    | 'form_submitted'
+    | 'smart_link_view'
+    | 'content_view';
   assetId?: string;
   assetTitle?: string;
+  smartLinkId?: string;
+  smartLinkSlug?: string;
+  smartLinkTitle?: string;
   timeSpent?: number; // in seconds
   timestamp?: Date;
   userAgent?: string;
   ipAddress?: string;
   email?: string;
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
 }
 
 export async function createAnalyticsEvent(
@@ -343,8 +357,20 @@ export interface AnalyticsSummary {
   totalPageViews: number;
   totalDownloads: number;
   totalTimeSpent: number; // in seconds
+  totalLeads: number;
+  totalSmartLinkViews: number;
+  uniqueCountries: number;
   mostViewedAssets: { assetId: string; assetTitle: string; views: number }[];
   mostDownloadedAssets: { assetId: string; assetTitle: string; downloads: number }[];
+  mostViewedSmartLinks: { smartLinkId: string; smartLinkTitle: string; views: number }[];
+  viewsByCountry: {
+    country: string;
+    countryCode?: string;
+    sessions: number;
+    pageViews: number;
+    totalTimeSpent: number;
+    averageTimeSpent: number;
+  }[];
   averageSessionTime: number; // in seconds
 }
 
@@ -354,6 +380,12 @@ export interface UserSession {
   userAgent: string;
   email?: string;
   companyName?: string;
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  city?: string;
+  smartLinkTitle?: string;
+  smartLinkSlug?: string;
   startTime: Date;
   endTime?: Date;
   totalTimeSpent: number;
@@ -361,28 +393,124 @@ export interface UserSession {
   downloads: { assetId: string; assetTitle: string; timestamp: Date }[];
 }
 
+async function buildSessionGeoMap(events: Analytics[]): Promise<Map<string, GeoLocation>> {
+  const result = new Map<string, GeoLocation>();
+  const ipBySession = new Map<string, string>();
+  const ipCache = new Map<string, GeoLocation>();
+
+  for (const event of events) {
+    if (!event.sessionId) continue;
+    if ((event.country || event.countryCode) && !result.has(event.sessionId)) {
+      result.set(event.sessionId, {
+        country: event.country,
+        countryCode: event.countryCode,
+        region: event.region,
+        city: event.city,
+      });
+    }
+    if (event.ipAddress && event.ipAddress !== 'unknown') {
+      ipBySession.set(event.sessionId, event.ipAddress);
+    }
+  }
+
+  for (const [sessionId, ip] of ipBySession) {
+    if (result.has(sessionId)) continue;
+    if (!ipCache.has(ip)) {
+      ipCache.set(ip, await lookupGeoFromStoredIp(ip));
+    }
+    const geo = ipCache.get(ip)!;
+    if (geo.country || geo.countryCode) {
+      result.set(sessionId, geo);
+    }
+  }
+
+  return result;
+}
+
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
   
-  const allAnalytics = await db.collection<Analytics>('analytics').find({}).toArray();
+  const [allAnalytics, leadCount] = await Promise.all([
+    db.collection<Analytics>('analytics').find({}).toArray(),
+    db.collection('formSubmissions').countDocuments({}),
+  ]);
   
-  // Get unique sessions
-  const uniqueSessions = new Set(allAnalytics.map(a => a.sessionId));
+  const uniqueSessions = new Set(allAnalytics.map((a) => a.sessionId));
   const totalSessions = uniqueSessions.size;
   
-  // Count page views and downloads
-  const pageViews = allAnalytics.filter(a => a.action === 'page_view');
-  const downloads = allAnalytics.filter(a => a.action === 'download');
-  const sessionEnds = allAnalytics.filter(a => a.action === 'session_end');
+  const pageViews = allAnalytics.filter(
+    (a) => a.action === 'page_view' || a.action === 'content_view'
+  );
+  const downloads = allAnalytics.filter((a) => a.action === 'download');
+  const sessionEnds = allAnalytics.filter((a) => a.action === 'session_end');
+  const smartLinkViews = allAnalytics.filter((a) => a.action === 'smart_link_view');
   
-  // Calculate total time spent
   const totalTimeSpent = sessionEnds.reduce((sum, event) => sum + (event.timeSpent || 0), 0);
   const averageSessionTime = totalSessions > 0 ? totalTimeSpent / totalSessions : 0;
+
+  const sessionMeta: Record<
+    string,
+    { country?: string; countryCode?: string; region?: string; city?: string; timeSpent: number; pageViews: number }
+  > = {};
+
+  for (const event of allAnalytics) {
+    if (!event.sessionId) continue;
+    if (!sessionMeta[event.sessionId]) {
+      sessionMeta[event.sessionId] = { timeSpent: 0, pageViews: 0 };
+    }
+    const meta = sessionMeta[event.sessionId];
+    if (event.country && !meta.country) {
+      meta.country = event.country;
+      meta.countryCode = event.countryCode;
+      meta.region = event.region;
+      meta.city = event.city;
+    }
+    if (event.action === 'page_view' || event.action === 'content_view') meta.pageViews += 1;
+    if (event.action === 'session_end') meta.timeSpent += event.timeSpent || 0;
+  }
+
+  const sessionGeoMap = await buildSessionGeoMap(allAnalytics);
+  for (const [sessionId, meta] of Object.entries(sessionMeta)) {
+    if (meta.country || meta.countryCode) continue;
+    const geo = sessionGeoMap.get(sessionId);
+    if (!geo) continue;
+    meta.country = geo.country;
+    meta.countryCode = geo.countryCode;
+    meta.region = geo.region;
+    meta.city = geo.city;
+  }
+
+  const countryStats: Record<
+    string,
+    { country: string; countryCode?: string; sessions: number; pageViews: number; totalTimeSpent: number }
+  > = {};
+
+  Object.values(sessionMeta).forEach((meta) => {
+    const key = meta.countryCode || meta.country || 'Unknown';
+    if (!countryStats[key]) {
+      countryStats[key] = {
+        country: meta.country || 'Unknown',
+        countryCode: meta.countryCode,
+        sessions: 0,
+        pageViews: 0,
+        totalTimeSpent: 0,
+      };
+    }
+    countryStats[key].sessions += 1;
+    countryStats[key].pageViews += meta.pageViews;
+    countryStats[key].totalTimeSpent += meta.timeSpent;
+  });
+
+  const viewsByCountry = Object.values(countryStats)
+    .map((row) => ({
+      ...row,
+      averageTimeSpent: row.sessions > 0 ? row.totalTimeSpent / row.sessions : 0,
+    }))
+    .sort((a, b) => b.sessions - a.sessions || b.totalTimeSpent - a.totalTimeSpent);
   
-  // Count views per asset
   const assetViews: Record<string, { assetId: string; assetTitle: string; views: number }> = {};
-  pageViews.forEach(view => {
+  pageViews.forEach((view) => {
     if (view.assetId) {
       if (!assetViews[view.assetId]) {
         assetViews[view.assetId] = {
@@ -395,9 +523,8 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
     }
   });
   
-  // Count downloads per asset
   const assetDownloads: Record<string, { assetId: string; assetTitle: string; downloads: number }> = {};
-  downloads.forEach(download => {
+  downloads.forEach((download) => {
     if (download.assetId) {
       if (!assetDownloads[download.assetId]) {
         assetDownloads[download.assetId] = {
@@ -409,8 +536,20 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
       assetDownloads[download.assetId].downloads++;
     }
   });
+
+  const smartLinkViewCounts: Record<string, { smartLinkId: string; smartLinkTitle: string; views: number }> = {};
+  smartLinkViews.forEach((view) => {
+    if (!view.smartLinkId) return;
+    if (!smartLinkViewCounts[view.smartLinkId]) {
+      smartLinkViewCounts[view.smartLinkId] = {
+        smartLinkId: view.smartLinkId,
+        smartLinkTitle: view.smartLinkTitle || view.smartLinkSlug || 'Smart Link',
+        views: 0,
+      };
+    }
+    smartLinkViewCounts[view.smartLinkId].views += 1;
+  });
   
-  // Sort and get top 10
   const mostViewedAssets = Object.values(assetViews)
     .sort((a, b) => b.views - a.views)
     .slice(0, 10);
@@ -418,14 +557,23 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
   const mostDownloadedAssets = Object.values(assetDownloads)
     .sort((a, b) => b.downloads - a.downloads)
     .slice(0, 10);
+
+  const mostViewedSmartLinks = Object.values(smartLinkViewCounts)
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 10);
   
   return {
     totalSessions,
     totalPageViews: pageViews.length,
     totalDownloads: downloads.length,
     totalTimeSpent,
+    totalLeads: leadCount,
+    totalSmartLinkViews: smartLinkViews.length,
+    uniqueCountries: viewsByCountry.filter((row) => row.country !== 'Unknown').length,
     mostViewedAssets,
     mostDownloadedAssets,
+    mostViewedSmartLinks,
+    viewsByCountry,
     averageSessionTime,
   };
 }
@@ -473,6 +621,12 @@ export async function getUserSessions(): Promise<UserSession[]> {
         userAgent: event.userAgent || 'unknown',
         email: emailInfo?.email,
         companyName: emailInfo?.companyName,
+        country: event.country,
+        countryCode: event.countryCode,
+        region: event.region,
+        city: event.city,
+        smartLinkTitle: event.smartLinkTitle,
+        smartLinkSlug: event.smartLinkSlug,
         startTime: event.timestamp || new Date(),
         totalTimeSpent: 0,
         pagesVisited: [],
@@ -481,13 +635,24 @@ export async function getUserSessions(): Promise<UserSession[]> {
     }
     
     const session = sessionsMap[event.sessionId];
+
+    if (event.country && !session.country) {
+      session.country = event.country;
+      session.countryCode = event.countryCode;
+      session.region = event.region;
+      session.city = event.city;
+    }
+    if (event.smartLinkTitle && !session.smartLinkTitle) {
+      session.smartLinkTitle = event.smartLinkTitle;
+      session.smartLinkSlug = event.smartLinkSlug;
+    }
     
     // Store email if form was submitted (also check analytics event)
     if (event.action === 'form_submitted' && event.email) {
       session.email = event.email;
     }
     
-    if (event.action === 'page_view' && event.assetId) {
+    if ((event.action === 'page_view' || event.action === 'content_view') && event.assetId) {
       session.pagesVisited.push({
         assetId: event.assetId,
         assetTitle: event.assetTitle || 'Unknown',
@@ -515,13 +680,26 @@ export async function getUserSessions(): Promise<UserSession[]> {
     }
   });
   
+  const sessionGeoMap = await buildSessionGeoMap(allAnalytics);
+
   // Convert to array and sort by start time (newest first)
   return Object.values(sessionsMap)
-    .map(session => ({
-      ...session,
-      startTime: session.startTime instanceof Date ? session.startTime : new Date(session.startTime),
-      endTime: session.endTime instanceof Date ? session.endTime : (session.endTime ? new Date(session.endTime) : undefined),
-    }))
+    .map((session) => {
+      const geo = sessionGeoMap.get(session.sessionId);
+      const enriched =
+        geo && !session.country && !session.countryCode
+          ? { ...session, ...geo }
+          : session;
+      return {
+        ...enriched,
+        startTime: enriched.startTime instanceof Date ? enriched.startTime : new Date(enriched.startTime),
+        endTime: enriched.endTime instanceof Date
+          ? enriched.endTime
+          : enriched.endTime
+            ? new Date(enriched.endTime)
+            : undefined,
+      };
+    })
     .sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
 }
 
