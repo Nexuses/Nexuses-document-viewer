@@ -1,8 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useState } from 'react';
-import { getDocumentPageCount } from '@/lib/document-meta';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { getDocumentPageCount, resolveMediaUrl } from '@/lib/document-meta';
 import type { SmartLink, SmartLinkContentItem } from '@/lib/smart-link-types';
 import ViewerErrorBoundary from './ViewerErrorBoundary';
 import ViewerStage from './ViewerStage';
@@ -96,6 +96,115 @@ function Thumbnail({ item }: { item: SmartLinkContentItem }) {
   );
 }
 
+function LoopingVideo({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let cancelled = false;
+    const tryPlay = () => {
+      if (cancelled) return;
+      void video.play().catch(() => {});
+    };
+
+    video.loop = true;
+    video.currentTime = 0;
+    tryPlay();
+    video.addEventListener('loadeddata', tryPlay, { once: true });
+    video.addEventListener('canplay', tryPlay, { once: true });
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener('loadeddata', tryPlay);
+      video.removeEventListener('canplay', tryPlay);
+    };
+  }, [src]);
+
+  return (
+    <div className="h-full w-full bg-black flex items-center justify-center">
+      <video
+        ref={videoRef}
+        key={src}
+        src={src}
+        controls
+        autoPlay
+        loop
+        playsInline
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+}
+
+function htmlDocument(html: string) {
+  if (/<html[\s>]/i.test(html)) return html;
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; min-height: 100%; background: #fff; }
+      img, video, iframe { max-width: 100%; }
+    </style>
+  </head>
+  <body>${html}</body>
+</html>`;
+}
+
+function HtmlFrame({ html, url, title }: { html?: string; url?: string; title: string }) {
+  const [srcDoc, setSrcDoc] = useState(() => (html ? htmlDocument(html) : undefined));
+
+  useEffect(() => {
+    if (html) {
+      setSrcDoc(htmlDocument(html));
+      return;
+    }
+    if (!url) {
+      setSrcDoc(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const resolved = await resolveMediaUrl(url);
+        const res = await fetch(resolved);
+        if (!res.ok) throw new Error('Failed to load HTML');
+        const type = res.headers.get('content-type') || '';
+        if (type.includes('application/json')) throw new Error('Unexpected JSON');
+        const text = await res.text();
+        if (!cancelled) setSrcDoc(htmlDocument(text));
+      } catch {
+        if (!cancelled) setSrcDoc(undefined);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [html, url]);
+
+  if (srcDoc) {
+    return (
+      <iframe
+        title={title}
+        srcDoc={srcDoc}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        className="h-full w-full border-0 bg-white"
+      />
+    );
+  }
+
+  if (url) {
+    return <iframe title={title} src={url} className="h-full w-full border-0 bg-white" />;
+  }
+
+  return <div className="h-full flex items-center justify-center text-gray-500 text-sm">This content cannot be previewed.</div>;
+}
+
 function ContentPane({
   item,
   pageCount,
@@ -123,7 +232,7 @@ function ContentPane({
       return (
         <iframe
           title={itemTitle(item)}
-          src={`https://www.youtube.com/embed/${yt}`}
+          src={`https://www.youtube.com/embed/${yt}?autoplay=1&mute=1&loop=1&playlist=${yt}`}
           className="h-full w-full border-0 bg-black"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
@@ -131,11 +240,7 @@ function ContentPane({
       );
     }
     if (item.type === 'video' && item.fileUrl) {
-      return (
-        <div className="h-full w-full bg-black flex items-center justify-center">
-          <video src={item.fileUrl} controls className="h-full w-full object-contain" />
-        </div>
-      );
+      return <LoopingVideo src={item.fileUrl} />;
     }
     if (item.type === 'image' && item.fileUrl) {
       return <img src={item.fileUrl} alt={itemTitle(item)} className="max-w-none" />;
@@ -143,15 +248,8 @@ function ContentPane({
     if (item.type === 'website' && item.url) {
       return <iframe title={itemTitle(item)} src={item.url} className="h-full w-full border-0 bg-white" />;
     }
-    if (item.type === 'html' && item.html) {
-      return (
-        <iframe
-          title={itemTitle(item)}
-          srcDoc={item.html}
-          sandbox="allow-scripts allow-same-origin"
-          className="h-full w-full border-0 bg-white"
-        />
-      );
+    if (item.type === 'html' && (item.html || item.fileUrl || item.url)) {
+      return <HtmlFrame html={item.html} url={item.fileUrl || item.url} title={itemTitle(item)} />;
     }
     return <div className="h-full flex items-center justify-center text-gray-500 text-sm">This content cannot be previewed.</div>;
   })();

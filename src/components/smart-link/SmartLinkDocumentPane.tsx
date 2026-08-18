@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { resolveMediaUrl } from '@/lib/document-meta';
-import { ViewerToolbar } from './ViewerStage';
+import { ViewerToolbar, ZoomSurface } from './ViewerStage';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -201,11 +201,12 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
 
   return (
     <div ref={setContainer} className="relative h-full w-full bg-[#edf1f4]">
-      <div ref={scrollerRef} className="h-full w-full overflow-y-auto overflow-x-hidden" onScroll={onScrollerScroll}>
+      <div ref={scrollerRef} className="h-full w-full overflow-auto" onScroll={onScrollerScroll}>
         {showPdf && (
           <Document
             key={url}
             file={url}
+            className="smart-link-pdf"
             onLoadSuccess={onPdfLoad}
             loading={<div className="p-10 text-sm text-gray-500">Loading document...</div>}
             error={<div className="p-10 text-sm text-red-600">Failed to load document.</div>}
@@ -238,11 +239,13 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
 
         {useOffice && (
           officeUrl ? (
-            <iframe
-              title="Office document"
-              src={officeEmbedUrl(officeUrl)}
-              className="h-full w-full border-0 bg-white"
-            />
+            <ZoomSurface scale={scale}>
+              <iframe
+                title="Office document"
+                src={officeEmbedUrl(officeUrl)}
+                className="h-full w-full border-0 bg-white"
+              />
+            </ZoomSurface>
           ) : (
             <div className="p-10 text-sm text-gray-500">Loading document...</div>
           )

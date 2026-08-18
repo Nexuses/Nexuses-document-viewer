@@ -24,7 +24,7 @@ export function ViewerToolbar({
   onFullscreen: () => void;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center z-20">
+    <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center z-30">
       <div
         className="pointer-events-auto flex items-center h-11 px-2 rounded-md text-white"
         style={{ background: 'rgba(38, 49, 56, 0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.28)' }}
@@ -67,10 +67,28 @@ export function ViewerToolbar({
             <span className="mx-1.5 h-5 w-px bg-white/35" />
           </>
         )}
-        <button type="button" onClick={onZoomIn} className="w-8 h-8 flex items-center justify-center text-[20px] leading-none" aria-label="Zoom in">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onZoomIn();
+          }}
+          className="w-8 h-8 flex items-center justify-center text-[20px] leading-none"
+          aria-label="Zoom in"
+        >
           +
         </button>
-        <button type="button" onClick={onZoomOut} className="w-8 h-8 flex items-center justify-center text-[20px] leading-none" aria-label="Zoom out">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onZoomOut();
+          }}
+          className="w-8 h-8 flex items-center justify-center text-[20px] leading-none"
+          aria-label="Zoom out"
+        >
           −
         </button>
         <div className="mx-1 w-[58px] h-7 rounded-[3px] bg-white text-[#2b3940] text-[12px] flex items-center justify-center">
@@ -81,6 +99,34 @@ export function ViewerToolbar({
             <path d="M8 3H4v4M16 3h4v4M8 21H4v-4M16 21h4v-4" />
           </svg>
         </button>
+      </div>
+    </div>
+  );
+}
+
+export function ZoomSurface({ scale, children }: { scale: number; children: ReactNode }) {
+  const layoutScale = Math.max(scale, 1);
+
+  return (
+    <div
+      className="grid place-items-center"
+      style={{
+        width: `${layoutScale * 100}%`,
+        height: `${layoutScale * 100}%`,
+        minWidth: '100%',
+        minHeight: '100%',
+      }}
+    >
+      <div
+        className="h-full w-full"
+        style={{
+          width: `${100 / layoutScale}%`,
+          height: `${100 / layoutScale}%`,
+          transform: `scale(${scale})`,
+          transformOrigin: scale >= 1 ? 'top left' : 'center center',
+        }}
+      >
+        {children}
       </div>
     </div>
   );
@@ -114,27 +160,23 @@ export default function ViewerStage({
 
   return (
     <div ref={setContainer} className="relative h-full w-full bg-white">
-      {mode === 'fill' ? (
-        <div className="h-full w-full overflow-hidden">
-          <div
-            className="h-full w-full"
-            style={{
-              width: `${100 / scale}%`,
-              height: `${100 / scale}%`,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            {children}
+      <div className="h-full w-full overflow-auto">
+        {mode === 'fill' ? (
+          <ZoomSurface scale={scale}>{children}</ZoomSurface>
+        ) : (
+          <div className="flex min-h-full min-w-full justify-center">
+            <div
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'top center',
+                marginBottom: scale > 1 ? `${(scale - 1) * 100}%` : 0,
+              }}
+            >
+              {children}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="h-full w-full overflow-auto flex justify-center">
-          <div style={{ transform: `scale(${scale})`, transformOrigin: 'top center', marginBottom: `${(scale - 1) * 100}%` }}>
-            {children}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
       <ViewerToolbar
         page={page}
         pages={pages}

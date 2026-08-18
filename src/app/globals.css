@@ -52,6 +52,10 @@ input[type="file"]::file-selector-button {
   height: auto !important;
 }
 
+.smart-link-pdf .react-pdf__Page__canvas {
+  max-width: none;
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
