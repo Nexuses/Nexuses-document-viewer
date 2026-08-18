@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
     ],
     unoptimized: true,
   },
+  transpilePackages: ["pptx-browser"],
   experimental: {
     serverActions: {
       bodySizeLimit: "200mb",

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ViewerToolbar } from './ViewerStage';
+import PptSlideStack from './PptSlideStack';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -27,17 +28,31 @@ function officeEmbedUrl(fileUrl: string) {
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
 }
 
-function shouldUsePdfEngine(url: string, kind?: string) {
+function filePath(url: string) {
   try {
-    const path = new URL(url, 'http://localhost').pathname.toLowerCase();
-    if (path.endsWith('.pdf')) return true;
-    if (/\.(ppt|pptx|doc|docx)$/.test(path)) return false;
+    return new URL(url, 'http://localhost').pathname.toLowerCase();
   } catch {
-    const path = url.split('?')[0].toLowerCase();
-    if (path.endsWith('.pdf')) return true;
-    if (/\.(ppt|pptx|doc|docx)$/.test(path)) return false;
+    return url.split('?')[0].toLowerCase();
   }
+}
+
+function isLegacyPpt(url: string) {
+  const path = filePath(url);
+  return path.endsWith('.ppt') && !path.endsWith('.pptx');
+}
+
+function shouldUsePdfEngine(url: string, kind?: string) {
+  const path = filePath(url);
+  if (path.endsWith('.pdf')) return true;
+  if (/\.(ppt|pptx|doc|docx)$/.test(path)) return false;
   return kind === 'pdf';
+}
+
+function shouldUseOffice(url: string, kind?: string) {
+  if (kind === 'doc') return true;
+  if (kind === 'ppt' && isLegacyPpt(url)) return true;
+  const path = filePath(url);
+  return /\.(doc|docx)$/.test(path);
 }
 
 function offsetTopIn(el: HTMLElement, root: HTMLElement) {
@@ -49,7 +64,7 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
   const [page, setPage] = useState(1);
   const [scale, setScale] = useState(1);
   const [pageWidth, setPageWidth] = useState(900);
-  const [useOffice, setUseOffice] = useState(() => !shouldUsePdfEngine(url, kind));
+  const [useOffice, setUseOffice] = useState(() => shouldUseOffice(url, kind));
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const pdfOptions = useRef(PDF_OPTIONS).current;
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -64,12 +79,15 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
   const onPagesLoadedRef = useRef(onPagesLoaded);
   onPagesLoadedRef.current = onPagesLoaded;
 
+  const showPdf = !useOffice && shouldUsePdfEngine(url, kind);
+  const showPpt = !useOffice && kind === 'ppt' && !showPdf;
+
   useEffect(() => {
     setPage(1);
     pageRef.current = 1;
     setScale(1);
     setNumPages(0);
-    setUseOffice(!shouldUsePdfEngine(url, kind));
+    setUseOffice(shouldUseOffice(url, kind));
     pageRefs.current.clear();
   }, [url, kind]);
 
@@ -88,8 +106,13 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
     return () => observer.disconnect();
   }, [container]);
 
-  const onLoad = useCallback(({ numPages: count }: { numPages: number }) => {
+  const onPdfLoad = useCallback(({ numPages: count }: { numPages: number }) => {
     setUseOffice(false);
+    setNumPages(count);
+    onPagesLoadedRef.current?.(count);
+  }, []);
+
+  const onPptLoad = useCallback((count: number) => {
     setNumPages(count);
     onPagesLoadedRef.current?.(count);
   }, []);
@@ -126,9 +149,6 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
 
   const goToPage = (next: number) => {
     const clamped = Math.min(totalPages, Math.max(1, next));
-    if (clamped === pageRef.current && !programmaticScroll.current) {
-      // still scroll into place if the counter was stale relative to view
-    }
     pageRef.current = clamped;
     setPage(clamped);
 
@@ -165,20 +185,13 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
   return (
     <div ref={setContainer} className="relative h-full w-full bg-[#edf1f4]">
       <div ref={scrollerRef} className="h-full w-full overflow-y-auto overflow-x-hidden" onScroll={onScrollerScroll}>
-        {!useOffice && (
+        {showPdf && (
           <Document
             key={url}
             file={url}
-            onLoadSuccess={onLoad}
-            onLoadError={() => {
-              if (kind === 'ppt' || kind === 'doc') setUseOffice(true);
-            }}
+            onLoadSuccess={onPdfLoad}
             loading={<div className="p-10 text-sm text-gray-500">Loading document...</div>}
-            error={
-              kind === 'pdf' ? (
-                <div className="p-10 text-sm text-red-600">Failed to load document.</div>
-              ) : null
-            }
+            error={<div className="p-10 text-sm text-red-600">Failed to load document.</div>}
             options={pdfOptions}
           >
             {numPages > 0 &&
@@ -206,15 +219,26 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
           </Document>
         )}
 
+        {showPpt && (
+          <PptSlideStack
+            url={url}
+            width={pageWidth}
+            scale={scale}
+            onLoad={onPptLoad}
+            onError={() => setUseOffice(true)}
+            onPageRef={(pageNumber, el) => {
+              if (el) pageRefs.current.set(pageNumber, el);
+              else pageRefs.current.delete(pageNumber);
+            }}
+          />
+        )}
+
         {useOffice && (
           <iframe
             title="Office document"
             src={officeEmbedUrl(url)}
             className="w-full border-0 bg-white"
-            style={{
-              height: container ? container.clientHeight * Math.max(1, expectedPages || 1) : '100%',
-              minHeight: '100%',
-            }}
+            style={{ height: '100%', minHeight: '100%' }}
           />
         )}
       </div>
