@@ -1,7 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getDocumentPageCount } from '@/lib/document-meta';
 import type { SmartLink, SmartLinkContentItem } from '@/lib/smart-link-types';
 import ViewerErrorBoundary from './ViewerErrorBoundary';
 import ViewerStage from './ViewerStage';
@@ -62,16 +63,10 @@ function itemMeta(item: SmartLinkContentItem, pages?: number) {
   return item.type;
 }
 
-function Thumbnail({
-  item,
-  onPagesLoaded,
-}: {
-  item: SmartLinkContentItem;
-  onPagesLoaded?: (count: number) => void;
-}) {
+function Thumbnail({ item }: { item: SmartLinkContentItem }) {
   const yt = youtubeId(item.url || item.fileUrl);
   if (item.type === 'pdf' && item.fileUrl) {
-    return <PdfThumbnail url={item.fileUrl} onPagesLoaded={onPagesLoaded} />;
+    return <PdfThumbnail url={item.fileUrl} />;
   }
   if (yt) {
     return (
@@ -103,9 +98,11 @@ function Thumbnail({
 
 function ContentPane({
   item,
+  pageCount,
   onPagesLoaded,
 }: {
   item: SmartLinkContentItem;
+  pageCount?: number;
   onPagesLoaded: (count: number) => void;
 }) {
   const yt = youtubeId(item.url || item.fileUrl);
@@ -115,7 +112,7 @@ function ContentPane({
       <SmartLinkDocumentPane
         url={fileUrl}
         kind={item.type}
-        expectedPages={item.pageCount || item.slideCount}
+        expectedPages={pageCount || item.pageCount || item.slideCount}
         onPagesLoaded={onPagesLoaded}
       />
     );
@@ -177,10 +174,24 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const selected = items.find((i) => i.id === selectedId) || items[0];
   const ownerName = displayName(link.owner);
 
-  const rememberPages = (id: string, count: number) => {
-    if (!count) return;
-    setPageCounts((prev) => (prev[id] === count ? prev : { ...prev, [id]: count }));
-  };
+  useEffect(() => {
+    let cancelled = false;
+
+    items.forEach((item) => {
+      if (item.type !== 'pdf' && item.type !== 'ppt' && item.type !== 'doc') return;
+      if (!(item.fileUrl || item.url)) return;
+      if (item.pageCount || item.slideCount) return;
+
+      void getDocumentPageCount(item).then((count) => {
+        if (cancelled || !count || count < 1) return;
+        setPageCounts((prev) => (prev[item.id] === count ? prev : { ...prev, [item.id]: count }));
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   const download = (item: SmartLinkContentItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -230,7 +241,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
                 className="w-full text-left flex items-center gap-3 px-2 py-[10px] mb-0.5"
                 style={{ background: active ? '#2a3b45' : 'transparent' }}
               >
-                <Thumbnail item={item} onPagesLoaded={(count) => rememberPages(item.id, count)} />
+                <Thumbnail item={item} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] leading-[1.2] truncate text-white">{itemTitle(item)}</p>
                   <p className="text-[12px] mt-1 truncate" style={{ color: '#b7c4cb' }}>
@@ -282,7 +293,10 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
           <ViewerErrorBoundary>
             <ContentPane
               item={selected}
-              onPagesLoaded={(count) => rememberPages(selected.id, count)}
+              pageCount={selected.pageCount || selected.slideCount || pageCounts[selected.id]}
+              onPagesLoaded={(count) =>
+                setPageCounts((prev) => (prev[selected.id] === count ? prev : { ...prev, [selected.id]: count }))
+              }
             />
           </ViewerErrorBoundary>
         ) : (
