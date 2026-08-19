@@ -39,7 +39,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-md:overflow-x-hidden">
       <div className="flex items-center justify-between mb-8 max-md:flex-col max-md:items-stretch max-md:gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -88,18 +88,18 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-md:overflow-x-auto">
+          <table className="w-full text-sm max-md:min-w-[52rem]">
             <thead className="bg-gray-50 text-left text-gray-600">
               <tr>
-                <th className="px-4 py-3 font-medium">Project</th>
-                <th className="px-4 py-3 font-medium">Users</th>
-                <th className="px-4 py-3 font-medium">Smart Links</th>
-                <th className="px-4 py-3 font-medium">Published</th>
-                <th className="px-4 py-3 font-medium">Drafts</th>
-                <th className="px-4 py-3 font-medium">Documents</th>
-                <th className="px-4 py-3 font-medium">Views</th>
-                <th className="px-4 py-3 font-medium">Leads</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Project</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Users</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Smart Links</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Published</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Drafts</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Documents</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Views</th>
+                <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Leads</th>
               </tr>
             </thead>
             <tbody>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
               )}
               {stats?.projects.map((project) => (
                 <tr key={project.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 max-md:whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       {project.logoUrl ? (
                         <img
@@ -139,13 +139,13 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{project.users}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{project.links}</td>
-                  <td className="px-4 py-3 text-gray-700">{project.published}</td>
-                  <td className="px-4 py-3 text-gray-700">{project.drafts}</td>
-                  <td className="px-4 py-3 text-gray-700">{project.documents}</td>
-                  <td className="px-4 py-3 text-gray-700">{project.views}</td>
-                  <td className="px-4 py-3 text-gray-700">{project.leads}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.users}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 max-md:whitespace-nowrap">{project.links}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.published}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.drafts}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.documents}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.views}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{project.leads}</td>
                 </tr>
               ))}
             </tbody>

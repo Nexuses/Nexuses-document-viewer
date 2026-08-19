@@ -144,7 +144,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-md:overflow-x-hidden">
       <div className="flex gap-0 mb-6">
         <button
           type="button"
@@ -214,14 +214,14 @@ export default function ProjectsPage() {
             )}
           </form>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm max-md:overflow-x-auto">
+            <table className="w-full text-sm max-md:min-w-[42rem]">
               <thead>
                 <tr className="text-left text-[#4b6b8a] border-b border-gray-100">
-                  <th className="px-5 py-2.5 font-semibold">Name</th>
-                  <th className="px-5 py-2.5 font-semibold">Slug</th>
-                  <th className="px-5 py-2.5 font-semibold">Users</th>
-                  <th className="px-5 py-2.5 font-semibold text-center">Logo</th>
+                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Name</th>
+                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Slug</th>
+                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Users</th>
+                  <th className="px-5 py-2.5 font-semibold text-center max-md:whitespace-nowrap">Logo</th>
                   <th className="px-5 py-2.5" />
                 </tr>
               </thead>
@@ -235,8 +235,8 @@ export default function ProjectsPage() {
                 ) : (
                   projects.map((project) => (
                     <tr key={project._id} className="border-t border-gray-100">
-                      <td className="px-5 py-2.5 align-middle text-gray-800">{project.name}</td>
-                      <td className="px-5 py-2.5 align-middle text-gray-600">{project.slug}</td>
+                      <td className="px-5 py-2.5 align-middle text-gray-800 max-md:whitespace-nowrap">{project.name}</td>
+                      <td className="px-5 py-2.5 align-middle text-gray-600 max-md:whitespace-nowrap">{project.slug}</td>
                       <td className="px-5 py-2.5 align-middle text-gray-800">{project.userCount}</td>
                       <td className="px-5 py-2.5 align-middle text-center">
                         {project.logoUrl ? (
@@ -328,13 +328,13 @@ export default function ProjectsPage() {
             )}
           </form>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm max-md:overflow-x-auto">
+            <table className="w-full text-sm max-md:min-w-[40rem]">
               <thead>
                 <tr className="text-left text-[#4b6b8a] border-b border-gray-100">
-                  <th className="px-5 py-3 font-semibold">Name</th>
-                  <th className="px-5 py-3 font-semibold">Username</th>
-                  <th className="px-5 py-3 font-semibold">Project</th>
+                  <th className="px-5 py-3 font-semibold max-md:whitespace-nowrap">Name</th>
+                  <th className="px-5 py-3 font-semibold max-md:whitespace-nowrap">Username</th>
+                  <th className="px-5 py-3 font-semibold max-md:whitespace-nowrap">Project</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
@@ -348,9 +348,9 @@ export default function ProjectsPage() {
                 ) : (
                   users.map((user) => (
                     <tr key={user._id} className="border-t border-gray-100">
-                      <td className="px-5 py-3 text-gray-800">{user.name}</td>
-                      <td className="px-5 py-3 text-gray-600">{user.username}</td>
-                      <td className="px-5 py-3 text-gray-800">{user.projectName}</td>
+                      <td className="px-5 py-3 text-gray-800 max-md:whitespace-nowrap">{user.name}</td>
+                      <td className="px-5 py-3 text-gray-600 max-md:whitespace-nowrap">{user.username}</td>
+                      <td className="px-5 py-3 text-gray-800 max-md:whitespace-nowrap">{user.projectName}</td>
                       <td className="px-5 py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
