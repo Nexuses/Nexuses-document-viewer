@@ -23,18 +23,18 @@ export default function PortalLeadsPage() {
   }, []);
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-md:overflow-x-hidden">
       <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
       <p className="text-sm text-gray-500 mt-1 mb-6">Form submissions from this project’s Smart Links</p>
 
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-md:overflow-x-auto">
+        <table className="w-full text-sm max-md:min-w-[40rem]">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
-              <th className="px-4 py-3 font-medium">Date</th>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">Smart Link</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Name</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Email</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Smart Link</th>
             </tr>
           </thead>
           <tbody>
@@ -55,12 +55,12 @@ export default function PortalLeadsPage() {
             {!loading &&
               leads.map((lead) => (
                 <tr key={lead._id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">
                     {lead.createdAt ? new Date(lead.createdAt).toLocaleString() : '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-900">{lead.name || '—'}</td>
-                  <td className="px-4 py-3 text-gray-700">{lead.email || '—'}</td>
-                  <td className="px-4 py-3 text-gray-700">{lead.smartLinkTitle || '—'}</td>
+                  <td className="px-4 py-3 text-gray-900 max-md:whitespace-nowrap">{lead.name || '—'}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{lead.email || '—'}</td>
+                  <td className="px-4 py-3 text-gray-700 max-md:whitespace-nowrap">{lead.smartLinkTitle || '—'}</td>
                 </tr>
               ))}
           </tbody>

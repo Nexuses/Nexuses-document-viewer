@@ -53,8 +53,8 @@ export default function PortalSmartLinksPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6 max-md:flex-col max-md:items-stretch">
+    <div className="p-8 max-md:overflow-x-hidden">
+      <div className="flex items-center justify-between mb-6 max-md:flex-col max-md:items-stretch max-md:gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Smart Links</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -69,14 +69,14 @@ export default function PortalSmartLinksPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-md:overflow-x-auto">
+        <table className="w-full text-sm max-md:min-w-[42rem]">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
-              <th className="px-4 py-3 font-medium">Smart Link Title</th>
-              <th className="px-4 py-3 font-medium">Owner</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Smart Link Title</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Owner</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Status</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap max-md:text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -89,8 +89,8 @@ export default function PortalSmartLinksPage() {
             )}
             {links.map((link) => (
               <tr key={link._id} className="border-t border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">{link.title}</td>
-                <td className="px-4 py-3 text-gray-600">{link.owner}</td>
+                <td className="px-4 py-3 font-medium text-gray-900 max-md:whitespace-nowrap">{link.title}</td>
+                <td className="px-4 py-3 text-gray-600 max-md:whitespace-nowrap">{link.owner}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -102,24 +102,24 @@ export default function PortalSmartLinksPage() {
                     {link.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/portal/smart-links/${link._id}`}>
+                <td className="px-4 py-3 max-md:whitespace-nowrap max-md:text-center">
+                  <div className="flex flex-wrap gap-2 max-md:flex-nowrap max-md:gap-3 max-md:justify-center">
+                    <Link className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={`/portal/smart-links/${link._id}`}>
                       View
                     </Link>
-                    <Link className="text-xs font-semibold text-[#120C29] underline" href={`/portal/smart-links/${link._id}/edit`}>
+                    <Link className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={`/portal/smart-links/${link._id}/edit`}>
                       Edit
                     </Link>
-                    <button className="text-xs font-semibold text-[#120C29] underline" type="button" onClick={() => duplicate(link._id!)}>
+                    <button className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" type="button" onClick={() => duplicate(link._id!)}>
                       Duplicate
                     </button>
-                    <button className="text-xs font-semibold text-red-700 underline" type="button" onClick={() => setDeleteId(link._id!)}>
+                    <button className="text-xs font-semibold text-red-700 underline max-md:shrink-0" type="button" onClick={() => setDeleteId(link._id!)}>
                       Delete
                     </button>
-                    <a className="text-xs font-semibold text-[#120C29] underline" href={shareUrl(link.slug)} target="_blank" rel="noreferrer">
+                    <a className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={shareUrl(link.slug)} target="_blank" rel="noreferrer">
                       Share
                     </a>
-                    <button className="text-xs font-semibold text-[#120C29] underline" type="button" onClick={() => copyLink(link.slug)}>
+                    <button className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" type="button" onClick={() => copyLink(link.slug)}>
                       Copy Link
                     </button>
                   </div>
