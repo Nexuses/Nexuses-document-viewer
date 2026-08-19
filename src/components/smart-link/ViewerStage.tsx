@@ -12,6 +12,7 @@ export function ViewerToolbar({
   onZoomIn,
   onZoomOut,
   onFullscreen,
+  mobilePosition = 'bottom',
 }: {
   page: number;
   pages: number;
@@ -22,11 +23,18 @@ export function ViewerToolbar({
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFullscreen: () => void;
+  mobilePosition?: 'bottom' | 'top';
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center z-30">
+    <div
+      className={`pointer-events-none absolute inset-x-0 flex justify-center z-30 px-2 ${
+        mobilePosition === 'top'
+          ? 'bottom-8 max-md:top-3 max-md:bottom-auto'
+          : 'bottom-8 max-md:bottom-3'
+      }`}
+    >
       <div
-        className="pointer-events-auto flex items-center h-11 px-2 rounded-md text-white"
+        className="pointer-events-auto flex items-center h-11 px-2 rounded-md text-white max-md:max-w-full max-md:overflow-x-auto"
         style={{ background: 'rgba(38, 49, 56, 0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.28)' }}
       >
         {showPages && (

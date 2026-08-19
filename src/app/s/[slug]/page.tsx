@@ -114,11 +114,11 @@ export default function PublicSmartLinkPage() {
             )}
           </div>
         </div>
-        <div className="pt-16 px-8 pb-10 text-center">
+        <div className="pt-16 px-8 pb-10 text-center max-md:px-4 max-md:pb-8">
           <p className="text-[15px]" style={{ color: '#8a9aa3' }}>
             {ownerName} shared the following content
           </p>
-          <h1 className="mt-3 text-[28px] leading-tight font-bold" style={{ color: '#1d3b4d' }}>
+          <h1 className="mt-3 text-[28px] leading-tight font-bold max-md:text-[22px]" style={{ color: '#1d3b4d' }}>
             {link.title}
           </h1>
           {link.description && (

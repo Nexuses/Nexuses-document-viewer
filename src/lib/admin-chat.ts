@@ -1,5 +1,6 @@
-import { getAnalyticsSummary, getProjects } from './db';
-import { getSmartLinkStats, getSmartLinks } from './smart-links';
+import type { SmartLinkActor } from './auth';
+import { getAnalyticsSummary, getFormSubmissions, getProjects } from './db';
+import { getProjectAdminStats, getSmartLinkStats, getSmartLinks } from './smart-links';
 
 export const ADMIN_CHAT_SYSTEM_PROMPT = `You are the in-app assistant for Master Admin of Nexuses Asset Viewer (also called Nexuses Smart Links).
 
@@ -80,6 +81,58 @@ Next.js (App Router) + TypeScript + Tailwind + MongoDB (database nexuses-asset) 
 - If the question is unrelated to this product, give a short answer only if it is harmless, then offer to help with Nexuses Admin, Smart Links, projects, analytics, or leads.
 `;
 
+export const PORTAL_CHAT_SYSTEM_PROMPT = `You are the in-app assistant for a Project Admin in the Nexuses Portal (Smart Links workspace).
+
+Answer only using this product's real behavior. Be concise, accurate, and practical. If you are unsure, say so instead of guessing. Prefer step-by-step instructions with the exact Portal menu names and URLs below. When the user asks about current counts, names, views, or leads, use the LIVE WORKSPACE SNAPSHOT provided with the request. Only talk about THIS project — never other projects or Master Admin data.
+
+Do not invent features, settings, or pages that are not listed here. Do not reveal API keys, MongoDB URIs, AWS secrets, or other credentials. Portal users cannot manage other projects, create project users, or open Master Admin Analytics.
+
+## What this product is
+Nexuses lets a project share sales/content packs as Smart Links. A Smart Link is a public page with a name/email gate, then a viewer for PDFs, PowerPoint, Word, video, images, websites, and HTML.
+
+## This workspace (Project Portal)
+- Login: /login (username + password)
+- After login: /portal
+- Sidebar: Dashboard, Smart Links, Leads
+- Logout is at the bottom of the dark left sidebar
+- The logged-in user only sees Smart Links and leads for their assigned project
+
+## Portal pages
+- Dashboard (/portal): cards for Smart Links, Published, Drafts, Leads, Documents, Total Views. Button: Create Smart Link. Recent Smart Links table with title, status, views.
+- Smart Links (/portal/smart-links): list this project's links; open, edit, duplicate, delete, copy public URL.
+- New Smart Link: /portal/smart-links/new (project is assigned automatically; there is no project picker)
+- Edit Smart Link: /portal/smart-links/[id]/edit
+- Leads (/portal/leads): form submissions (date, name, email, Smart Link title) from this project's links
+
+There is no Analytics page in Portal. Visitor country/time analytics live in Master Admin only. Portal users can still see view counts on each Smart Link and leads on /portal/leads.
+
+## How to create a Smart Link (Portal)
+1. Dashboard → Create Smart Link, or Smart Links → create/new.
+2. Enter Title (slug auto-fills from title on create).
+3. Optional: description, cover image, company logo.
+4. Set status Draft or Published.
+5. Add content: Add PDF, Add PPT, Add Video, Add Image, Add Website URL, HTML, DOC, UTM, Lead Form.
+6. Upload a file or paste a URL. HTML can be pasted markup or a file/URL.
+7. Save.
+
+Public URL format: {origin}/s/{slug}
+Copying the link from the Smart Links list copies that URL.
+
+Draft vs Published: status is a workflow flag. The public page loads by slug; if someone has the URL they can still open it. Use Published when the link is ready to share.
+
+## Public Smart Link visitor flow
+1. Visitor opens /s/{slug}
+2. They enter Name and Email and agree → a lead is created and a unique view is counted per email
+3. The viewer opens with a sidebar of content items
+4. Videos autoplay and loop; PDF uses the in-app viewer; PPT/DOC use Microsoft Office embed; zoom is available in the toolbar
+
+## How you should answer
+- For "how do I..." give numbered steps using the Portal UI (not Master Admin paths).
+- For counts/names, quote the live snapshot for this project.
+- If asked about other projects, Master Admin, or creating portal users, say that is only available to Master Admin at /admin.
+- If the question is unrelated, give a short harmless answer then offer to help with this project's Smart Links or leads.
+`;
+
 function summarizeContent(content: Array<{ type?: string }> | undefined) {
   if (!content?.length) return 'no content';
   const counts: Record<string, number> = {};
@@ -90,6 +143,59 @@ function summarizeContent(content: Array<{ type?: string }> | undefined) {
   return Object.entries(counts)
     .map(([type, count]) => `${count} ${type}`)
     .join(', ');
+}
+
+export function chatSystemPrompt(actor: SmartLinkActor): string {
+  if (actor.role === 'project') {
+    return `${PORTAL_CHAT_SYSTEM_PROMPT}\nCurrent portal user: ${actor.owner}. Current project: ${actor.projectName} (slug=${actor.projectSlug}, id=${actor.projectId}).`;
+  }
+  return ADMIN_CHAT_SYSTEM_PROMPT;
+}
+
+export async function buildChatSnapshot(actor: SmartLinkActor): Promise<string> {
+  if (actor.role === 'project') return buildPortalChatSnapshot(actor);
+  return buildAdminChatSnapshot();
+}
+
+async function buildPortalChatSnapshot(actor: Extract<SmartLinkActor, { role: 'project' }>): Promise<string> {
+  try {
+    const [stats, links, submissions] = await Promise.all([
+      getProjectAdminStats(actor.projectId),
+      getSmartLinks(actor.projectId),
+      getFormSubmissions(),
+    ]);
+
+    const linkIds = new Set(links.map((link) => link._id).filter(Boolean) as string[]);
+    const slugs = new Set(links.map((link) => link.slug).filter(Boolean));
+    const linkLines = links.slice(0, 40).map((link) => {
+      const types = summarizeContent(link.content);
+      return `- ${link.title} | slug=${link.slug} | status=${link.status} | views=${link.views ?? 0} | content=${types}`;
+    });
+
+    const leadLines = submissions
+      .filter(
+        (lead) =>
+          (lead.smartLinkId && linkIds.has(lead.smartLinkId)) ||
+          (lead.smartLinkSlug && slugs.has(lead.smartLinkSlug))
+      )
+      .slice(0, 25)
+      .map((lead) => {
+        const when = lead.createdAt ? new Date(lead.createdAt).toISOString() : 'unknown-date';
+        return `- ${lead.name || 'unnamed'} <${lead.email || 'no-email'}> | link=${lead.smartLinkTitle || lead.smartLinkSlug || 'unknown'} | ${when}`;
+      });
+
+    return [
+      `LIVE PROJECT SNAPSHOT for ${actor.projectName} (source of truth for this portal user):`,
+      `Totals: smartLinks=${stats.totalSmartLinks}, published=${stats.publishedLinks}, drafts=${stats.draftLinks}, documents=${stats.totalDocuments}, uniqueViews=${stats.totalViews}, leads=${stats.leads}, projectUsers=${stats.users}`,
+      'Smart Links:',
+      linkLines.length ? linkLines.join('\n') : '- none',
+      'Recent leads:',
+      leadLines.length ? leadLines.join('\n') : '- none',
+    ].join('\n');
+  } catch (error) {
+    console.error('Failed to build portal chat snapshot:', error);
+    return 'LIVE PROJECT SNAPSHOT unavailable. Answer from product knowledge only and say current counts cannot be loaded.';
+  }
 }
 
 export async function buildAdminChatSnapshot(): Promise<string> {

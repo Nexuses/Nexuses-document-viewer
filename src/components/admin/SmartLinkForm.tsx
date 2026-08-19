@@ -186,8 +186,8 @@ export default function SmartLinkForm({
   const nextProjectName = projects.find((item) => item._id === projectId)?.name || 'the selected project';
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl space-y-8">
-      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="max-w-4xl space-y-8 max-md:space-y-5">
+      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 max-md:p-4">
         <h2 className="text-lg font-semibold text-gray-900">Smart Link details</h2>
         {showProjectSelect && (
           <Field label="Project">
@@ -257,7 +257,7 @@ export default function SmartLinkForm({
         </Field>
       </section>
 
-      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+      <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 max-md:p-4">
         <h2 className="text-lg font-semibold text-gray-900">Content Builder</h2>
         <div className="flex flex-wrap gap-2">
           {CONTENT_BUTTONS.map((btn) => (

@@ -7,13 +7,20 @@ interface ChatMessage {
   content: string;
 }
 
-const STARTER_QUESTIONS = [
-  'How do I create a Smart Link?',
-  'Where do I see visitor countries?',
-  'How do project users log in?',
-];
+const STARTER_QUESTIONS = {
+  admin: [
+    'How do I create a Smart Link?',
+    'Where do I see visitor countries?',
+    'How do project users log in?',
+  ],
+  portal: [
+    'How do I create a Smart Link?',
+    'How do I share a Smart Link?',
+    'Where are my leads?',
+  ],
+} as const;
 
-export default function AdminChatbot() {
+export default function AdminChatbot({ workspace = 'admin' }: { workspace?: 'admin' | 'portal' }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +29,9 @@ export default function AdminChatbot() {
     {
       role: 'assistant',
       content:
-        'Hi — I can help with this Admin workspace: Smart Links, projects, users, analytics, leads, and the public viewer. Ask anything about how this project works.',
+        workspace === 'portal'
+          ? 'Hi — I can help with this project portal: Smart Links, sharing public URLs, leads, and the viewer. Ask anything about this project.'
+          : 'Hi — I can help with this Admin workspace: Smart Links, projects, users, analytics, leads, and the public viewer. Ask anything about how this project works.',
     },
   ]);
   const listRef = useRef<HTMLDivElement>(null);
@@ -71,13 +80,15 @@ export default function AdminChatbot() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 max-md:bottom-3 max-md:right-3">
       {open && (
-        <section className="w-[min(100vw-2.5rem,400px)] h-[min(72vh,560px)] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
+        <section className="w-[min(100vw-2.5rem,400px)] h-[min(72vh,560px)] max-md:w-[calc(100vw-1.5rem)] max-md:h-[min(70dvh,520px)] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
           <header className="px-4 py-3 bg-[#120C29] text-white flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Nexuses Assistant</p>
-              <p className="text-xs text-white/70">Answers about this Admin workspace</p>
+              <p className="text-xs text-white/70">
+                {workspace === 'portal' ? 'Answers about this project portal' : 'Answers about this Admin workspace'}
+              </p>
             </div>
             <button
               type="button"
@@ -113,7 +124,7 @@ export default function AdminChatbot() {
             {error && <p className="text-xs text-red-600">{error}</p>}
             {messages.length === 1 && !loading && (
               <div className="flex flex-wrap gap-2 pt-1">
-                {STARTER_QUESTIONS.map((question) => (
+                {STARTER_QUESTIONS[workspace].map((question) => (
                   <button
                     key={question}
                     type="button"
@@ -140,7 +151,11 @@ export default function AdminChatbot() {
                   }
                 }}
                 rows={2}
-                placeholder="Ask about Smart Links, analytics, projects..."
+                placeholder={
+                  workspace === 'portal'
+                    ? 'Ask about Smart Links, sharing, or leads...'
+                    : 'Ask about Smart Links, analytics, projects...'
+                }
                 className="flex-1 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#120C29]"
               />
               <button

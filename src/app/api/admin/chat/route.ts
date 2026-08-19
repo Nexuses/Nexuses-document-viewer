@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { ADMIN_CHAT_SYSTEM_PROMPT, buildAdminChatSnapshot } from '@/lib/admin-chat';
+import { getSmartLinkActor } from '@/lib/auth';
+import { buildChatSnapshot, chatSystemPrompt } from '@/lib/admin-chat';
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const MAX_MESSAGES = 20;
@@ -33,8 +33,8 @@ function sanitizeMessages(input: unknown): ChatMessage[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const actor = await getSmartLinkActor(request);
+    if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A question is required' }, { status: 400 });
     }
 
-    const snapshot = await buildAdminChatSnapshot();
+    const snapshot = await buildChatSnapshot(actor);
 
     const response = await fetch(DEEPSEEK_URL, {
       method: 'POST',
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         temperature: 0.2,
         max_tokens: 900,
         messages: [
-          { role: 'system', content: ADMIN_CHAT_SYSTEM_PROMPT },
+          { role: 'system', content: chatSystemPrompt(actor) },
           { role: 'system', content: snapshot },
           ...messages,
         ],

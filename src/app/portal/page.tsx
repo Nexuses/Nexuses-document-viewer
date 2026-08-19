@@ -45,7 +45,7 @@ export default function PortalDashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 max-md:flex-col max-md:items-stretch">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -56,7 +56,7 @@ export default function PortalDashboardPage() {
         </div>
         <Link
           href="/portal/smart-links/new"
-          className="px-4 py-2.5 bg-[#120C29] text-white rounded-lg text-sm font-medium hover:bg-[#0f0a23]"
+          className="px-4 py-2.5 bg-[#120C29] text-white rounded-lg text-sm font-medium hover:bg-[#0f0a23] max-md:text-center"
         >
           Create Smart Link
         </Link>

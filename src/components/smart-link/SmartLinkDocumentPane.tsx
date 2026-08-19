@@ -121,7 +121,15 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
 
   useEffect(() => {
     if (!container) return;
-    const measure = () => setPageWidth(Math.max(560, Math.min(container.clientWidth - 32, 1100)));
+    const measure = () => {
+      const padding = 24;
+      const available = Math.max(container.clientWidth - padding, 200);
+      if (container.clientWidth < 768) {
+        setPageWidth(available);
+        return;
+      }
+      setPageWidth(Math.max(560, Math.min(available, 1100)));
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(container);
@@ -243,7 +251,7 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
               <iframe
                 title="Office document"
                 src={officeEmbedUrl(officeUrl)}
-                className="h-full w-full border-0 bg-white"
+                className="h-full w-full border-0 bg-white max-md:min-h-[calc(100dvh-3.5rem)]"
               />
             </ZoomSurface>
           ) : (
@@ -255,6 +263,8 @@ export default function SmartLinkDocumentPane({ url, kind = 'pdf', expectedPages
       <ViewerToolbar
         page={page}
         pages={totalPages}
+        showPages={!useOffice}
+        mobilePosition={useOffice ? 'top' : 'bottom'}
         scale={scale}
         onPrev={() => goToPage(pageRef.current - 1)}
         onNext={() => goToPage(pageRef.current + 1)}

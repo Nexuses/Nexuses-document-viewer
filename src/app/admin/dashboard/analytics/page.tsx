@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-md:overflow-x-hidden">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex flex-wrap gap-6">
+        <nav className="-mb-px flex flex-wrap gap-6 max-md:gap-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -255,21 +255,21 @@ export default function AnalyticsPage() {
                 </div>
               ) : (
                 userSessions.map((session) => (
-                  <div key={session.sessionId} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                  <div key={session.sessionId} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm max-md:overflow-hidden max-md:min-w-0">
                     <div className="flex flex-wrap items-start justify-between gap-4 mb-4 pb-4 border-b border-gray-100">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
+                      <div className="min-w-0 max-md:w-full">
+                        <h3 className="text-lg font-semibold text-gray-900 max-md:break-all">
                           {session.email || `Session ${session.sessionId.slice(0, 12)}...`}
                         </h3>
                         {session.smartLinkTitle && (
-                          <p className="text-sm text-gray-600 mt-1">Smart Link: {session.smartLinkTitle}</p>
+                          <p className="text-sm text-gray-600 mt-1 max-md:break-words">Smart Link: {session.smartLinkTitle}</p>
                         )}
                         <div className="mt-3 space-y-1 text-sm text-gray-600">
-                          <p><span className="font-medium text-gray-800">Location:</span> {locationLabel(session)}</p>
-                          <p><span className="font-medium text-gray-800">IP:</span> {session.ipAddress}</p>
-                          <p><span className="font-medium text-gray-800">Started:</span> {formatDate(session.startTime)}</p>
+                          <p className="max-md:break-words"><span className="font-medium text-gray-800">Location:</span> {locationLabel(session)}</p>
+                          <p className="max-md:break-all"><span className="font-medium text-gray-800">IP:</span> {session.ipAddress}</p>
+                          <p className="max-md:break-words"><span className="font-medium text-gray-800">Started:</span> {formatDate(session.startTime)}</p>
                           {session.endTime && (
-                            <p><span className="font-medium text-gray-800">Ended:</span> {formatDate(session.endTime)}</p>
+                            <p className="max-md:break-words"><span className="font-medium text-gray-800">Ended:</span> {formatDate(session.endTime)}</p>
                           )}
                           <p><span className="font-medium text-gray-800">Time Spent:</span> {formatTime(session.totalTimeSpent)}</p>
                         </div>
@@ -283,27 +283,27 @@ export default function AnalyticsPage() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-md:min-w-0">
+                      <div className="min-w-0">
                         <h4 className="font-semibold text-gray-900 mb-2">Pages Viewed ({session.pagesVisited.length})</h4>
                         <div className="space-y-2">
                           {session.pagesVisited.map((page, index) => (
-                            <div key={`${page.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3">
-                              <p className="font-medium text-gray-900">{page.assetTitle}</p>
+                            <div key={`${page.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3 max-md:min-w-0 max-md:overflow-hidden">
+                              <p className="font-medium text-gray-900 max-md:break-all">{page.assetTitle}</p>
                               <p className="text-xs text-gray-500 mt-1">{formatDate(page.timestamp)}</p>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="font-semibold text-gray-900 mb-2">Downloads ({session.downloads.length})</h4>
                         <div className="space-y-2">
                           {session.downloads.length === 0 ? (
                             <p className="text-sm text-gray-500">No downloads</p>
                           ) : (
                             session.downloads.map((download, index) => (
-                              <div key={`${download.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3">
-                                <p className="font-medium text-gray-900">{download.assetTitle}</p>
+                              <div key={`${download.assetId}-${index}`} className="text-sm bg-gray-50 rounded-lg p-3 max-md:min-w-0 max-md:overflow-hidden">
+                                <p className="font-medium text-gray-900 max-md:break-all">{download.assetTitle}</p>
                                 <p className="text-xs text-gray-500 mt-1">{formatDate(download.timestamp)}</p>
                               </div>
                             ))
@@ -328,11 +328,11 @@ export default function AnalyticsPage() {
                     <p className="px-6 py-8 text-sm text-gray-500">No smart link views yet.</p>
                   ) : (
                     summary.mostViewedSmartLinks.map((link, index) => (
-                      <div key={link.smartLinkId} className="px-6 py-4 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900">#{index + 1} {link.smartLinkTitle}</p>
+                      <div key={link.smartLinkId} className="px-6 py-4 flex items-center justify-between gap-3 min-w-0">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 max-md:break-words">#{index + 1} {link.smartLinkTitle}</p>
                         </div>
-                        <p className="text-sm font-semibold text-gray-700">{link.views} opens</p>
+                        <p className="text-sm font-semibold text-gray-700 shrink-0">{link.views} opens</p>
                       </div>
                     ))
                   )}
@@ -348,9 +348,9 @@ export default function AnalyticsPage() {
                     <p className="px-6 py-8 text-sm text-gray-500">No asset views yet.</p>
                   ) : (
                     summary.mostViewedAssets.map((asset, index) => (
-                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between">
-                        <p className="font-medium text-gray-900">#{index + 1} {asset.assetTitle}</p>
-                        <p className="text-sm font-semibold text-gray-700">{asset.views} views</p>
+                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between gap-3 min-w-0">
+                        <p className="font-medium text-gray-900 min-w-0 max-md:break-all">#{index + 1} {asset.assetTitle}</p>
+                        <p className="text-sm font-semibold text-gray-700 shrink-0">{asset.views} views</p>
                       </div>
                     ))
                   )}
@@ -366,9 +366,9 @@ export default function AnalyticsPage() {
                     <p className="px-6 py-8 text-sm text-gray-500">No downloads yet.</p>
                   ) : (
                     summary.mostDownloadedAssets.map((asset, index) => (
-                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between">
-                        <p className="font-medium text-gray-900">#{index + 1} {asset.assetTitle}</p>
-                        <p className="text-sm font-semibold text-gray-700">{asset.downloads} downloads</p>
+                      <div key={asset.assetId} className="px-6 py-4 flex items-center justify-between gap-3 min-w-0">
+                        <p className="font-medium text-gray-900 min-w-0 max-md:break-all">#{index + 1} {asset.assetTitle}</p>
+                        <p className="text-sm font-semibold text-gray-700 shrink-0">{asset.downloads} downloads</p>
                       </div>
                     ))
                   )}

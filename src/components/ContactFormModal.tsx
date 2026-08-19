@@ -59,7 +59,7 @@ export default function ContactFormModal({ onClose, onSubmit, sessionId }: Conta
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/5">
       <div className="bg-white rounded-lg shadow-xl border-2 border-purple-500 shadow-[0_0_0_2px_rgba(168,85,247,0.35),0_0_28px_rgba(168,85,247,0.55)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
+        <div className="p-8 max-md:p-5">
           {/* Mobile: Branding */}
           <div className="lg:hidden flex items-center justify-start mb-4">
             <Image
@@ -72,7 +72,7 @@ export default function ContactFormModal({ onClose, onSubmit, sessionId }: Conta
               priority
             />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 max-md:text-xl">
             Please Complete the Form to View the Document
           </h2>
           <p className="text-gray-600 mb-6">

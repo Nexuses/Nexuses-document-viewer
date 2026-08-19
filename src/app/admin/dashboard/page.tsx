@@ -40,21 +40,21 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 max-md:flex-col max-md:items-stretch">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">Master Admin overview across all projects</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 max-md:flex-col">
           <Link
             href="/admin/dashboard/projects"
-            className="px-4 py-2.5 border border-gray-300 bg-white text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50"
+            className="px-4 py-2.5 border border-gray-300 bg-white text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-50 max-md:w-full max-md:text-center"
           >
             Manage Projects
           </Link>
           <Link
             href="/admin/dashboard/smart-links/new"
-            className="px-4 py-2.5 bg-[#120C29] text-white rounded-lg text-sm font-medium hover:bg-[#0f0a23]"
+            className="px-4 py-2.5 bg-[#120C29] text-white rounded-lg text-sm font-medium hover:bg-[#0f0a23] max-md:w-full max-md:text-center"
           >
             Create Smart Link
           </Link>

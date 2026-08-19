@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import AdminChatbot from '@/components/admin/AdminChatbot';
+import AppShellFrame from '@/components/AppShellFrame';
 
 type PortalUser = {
   name: string;
@@ -19,6 +21,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   }
   const [user, setUser] = useState<PortalUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -56,54 +59,62 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="h-screen overflow-hidden flex bg-gray-50">
-      <aside className="w-64 h-screen shrink-0 bg-[#120C29] text-white flex flex-col">
-        <div className="p-5 border-b border-white/10">
-          <div className="bg-white rounded-xl px-3 py-3 flex justify-center">
-            {user.logoUrl ? (
-              <img src={user.logoUrl} alt={user.projectName} className="h-12 object-contain" />
-            ) : (
-              <Image
-                src="https://cdn-nexlink.s3.us-east-2.amazonaws.com/Nexuses-full-logo-dark_8d412ea3-bf11-4fc6-af9c-bee7e51ef494.png"
-                alt="Nexuses Logo"
-                width={160}
-                height={48}
-                className="object-contain"
-                unoptimized
-              />
-            )}
+    <AppShellFrame
+      title={user.projectName}
+      open={navOpen}
+      onOpen={() => setNavOpen(true)}
+      onClose={() => setNavOpen(false)}
+      pathname={pathname}
+      extra={<AdminChatbot workspace="portal" />}
+      sidebar={
+        <>
+          <div className="p-5 border-b border-white/10">
+            <div className="bg-white rounded-xl px-3 py-3 flex justify-center">
+              {user.logoUrl ? (
+                <img src={user.logoUrl} alt={user.projectName} className="h-12 object-contain max-w-full" />
+              ) : (
+                <Image
+                  src="https://cdn-nexlink.s3.us-east-2.amazonaws.com/Nexuses-full-logo-dark_8d412ea3-bf11-4fc6-af9c-bee7e51ef494.png"
+                  alt="Nexuses Logo"
+                  width={160}
+                  height={48}
+                  className="object-contain"
+                  unoptimized
+                />
+              )}
+            </div>
+            <p className="text-sm font-semibold mt-3 truncate">{user.projectName}</p>
+            <p className="text-xs text-white/60 mt-1 truncate">Project Admin · {user.username}</p>
           </div>
-          <p className="text-sm font-semibold mt-3 truncate">{user.projectName}</p>
-          <p className="text-xs text-white/60 mt-1 truncate">Project Admin · {user.username}</p>
-        </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {nav.map((item) => {
-            const active = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  active ? 'bg-white text-[#120C29]' : 'text-white/80 hover:bg-white/10'
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="p-4 border-t border-white/10 mt-auto">
-          <button
-            onClick={handleLogout}
-            className="w-full px-3 py-2.5 rounded-lg text-sm font-semibold bg-white text-[#120C29] hover:bg-gray-100 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
-      <main className="flex-1 min-w-0 h-screen overflow-y-auto text-gray-900 bg-gray-50">{children}</main>
-    </div>
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+            {nav.map((item) => {
+              const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setNavOpen(false)}
+                  className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    active ? 'bg-white text-[#120C29]' : 'text-white/80 hover:bg-white/10'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="p-4 border-t border-white/10 mt-auto">
+            <button
+              onClick={handleLogout}
+              className="w-full px-3 py-2.5 rounded-lg text-sm font-semibold bg-white text-[#120C29] hover:bg-gray-100 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </>
+      }
+    >
+      {children}
+    </AppShellFrame>
   );
 }

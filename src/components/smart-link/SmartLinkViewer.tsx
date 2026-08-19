@@ -271,6 +271,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const items = useMemo(() => viewableItems(link), [link]);
   const [selectedId, setSelectedId] = useState(items[0]?.id);
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const selected = items.find((i) => i.id === selectedId) || items[0];
   const ownerName = displayName(link.owner);
   const geoRef = useClientGeo();
@@ -410,14 +411,52 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
 
   return (
     <div
-      className="h-dvh w-screen overflow-hidden flex"
+      className="h-dvh w-screen overflow-hidden flex max-md:flex-col"
       style={{
         fontFamily: 'Arial, Helvetica, sans-serif',
         color: '#fff',
       }}
     >
-      <aside className="h-full w-[28%] min-w-[300px] max-w-[380px] shrink-0 flex flex-col" style={{ background: '#1c2b36' }}>
+      <header className="hidden max-md:flex shrink-0 h-14 items-center gap-3 px-3" style={{ background: '#1c2b36' }}>
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="h-10 w-10 flex items-center justify-center rounded-lg hover:bg-white/10"
+          aria-label="Open content list"
+        >
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <p className="text-sm font-semibold truncate">{link.title}</p>
+      </header>
+
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="hidden max-md:block fixed inset-0 z-[60] bg-black/40"
+          aria-label="Close content list"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`h-full w-[28%] min-w-[300px] max-w-[380px] shrink-0 flex flex-col max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[70] max-md:w-[min(86vw,340px)] max-md:min-w-0 max-md:max-w-none max-md:transition-transform ${
+          sidebarOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'
+        }`}
+        style={{ background: '#1c2b36' }}
+      >
         <div className="px-6 pt-6 pb-4 shrink-0">
+          <div className="hidden max-md:flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/10"
+              aria-label="Close content list"
+            >
+              ×
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             {link.companyLogo ? (
               <img src={link.companyLogo} alt="" className="h-11 w-11 rounded-full object-cover bg-white" />
@@ -439,7 +478,10 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => {
+                  setSelectedId(item.id);
+                  setSidebarOpen(false);
+                }}
                 className="w-full text-left flex items-center gap-3 px-2 py-[10px] mb-0.5"
                 style={{ background: active ? '#2a3b45' : 'transparent' }}
               >
@@ -490,7 +532,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 h-full bg-white overflow-hidden">
+      <main className="flex-1 min-w-0 h-full bg-white overflow-hidden max-md:min-h-0">
         {selected ? (
           <ViewerErrorBoundary>
             <ContentPane

@@ -108,11 +108,11 @@ export default function SubmissionsPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Form Submissions</h1>
+        <div className="flex justify-between items-center mb-6 max-md:flex-col max-md:items-stretch max-md:gap-3">
+          <h1 className="text-3xl font-bold text-gray-900 max-md:text-2xl">Form Submissions</h1>
           <Link
             href="/admin/dashboard"
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 max-md:text-center"
           >
             Back to Dashboard
           </Link>

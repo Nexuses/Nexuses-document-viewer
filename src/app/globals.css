@@ -70,3 +70,42 @@ input[type="file"]::file-selector-button {
 .animate-slide-down {
   animation: slideDown 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* Phone-only layout tweaks. Screens 768px and up stay unchanged. */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  .p-8 {
+    padding: 1rem !important;
+  }
+
+  .px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  img,
+  video,
+  iframe {
+    max-width: 100%;
+  }
+
+  .overflow-hidden:has(table) {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 36rem;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    max-width: 100%;
+  }
+}
