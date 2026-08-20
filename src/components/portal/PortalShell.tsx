@@ -55,6 +55,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   const nav = [
     { href: '/portal', label: 'Dashboard', exact: true },
     { href: '/portal/smart-links', label: 'Smart Links' },
+    { href: '/portal/analytics', label: 'Analytics' },
     { href: '/portal/leads', label: 'Leads' },
   ];
 

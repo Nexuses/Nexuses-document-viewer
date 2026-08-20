@@ -1,30 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAnalyticsEvent, getAnalytics, getAnalyticsSummary, getUserSessions, deleteUserSession } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import {
+  createAnalyticsEvent,
+  getAnalytics,
+  getAnalyticsSummary,
+  getUserSessions,
+  deleteUserSession,
+  type AnalyticsScope,
+} from '@/lib/db';
+import { getSmartLinkActor } from '@/lib/auth';
 import { resolveEventGeo } from '@/lib/geo';
+import { getSmartLinks } from '@/lib/smart-links';
+
+async function resolveAnalyticsScope(
+  actor: NonNullable<Awaited<ReturnType<typeof getSmartLinkActor>>>
+): Promise<AnalyticsScope | undefined> {
+  if (actor.role !== 'project') return undefined;
+  const links = await getSmartLinks(actor.projectId);
+  return {
+    smartLinkIds: new Set(links.map((link) => link._id).filter(Boolean) as string[]),
+    smartLinkSlugs: new Set(links.map((link) => link.slug)),
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const actor = await getSmartLinkActor(request);
+    if (!actor) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    const scope = await resolveAnalyticsScope(actor);
     const { searchParams } = new URL(request.url);
     const summary = searchParams.get('summary') === 'true';
     const sessions = searchParams.get('sessions') === 'true';
 
     if (sessions) {
-      const userSessions = await getUserSessions();
+      const userSessions = await getUserSessions(scope);
       return NextResponse.json(userSessions);
     } else if (summary) {
-      const analyticsSummary = await getAnalyticsSummary();
+      const analyticsSummary = await getAnalyticsSummary(scope);
       return NextResponse.json(analyticsSummary);
     } else {
-      const analytics = await getAnalytics();
+      const analytics = await getAnalytics(scope);
       return NextResponse.json(analytics);
     }
   } catch (error) {
@@ -110,8 +130,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const actor = await getSmartLinkActor(request);
+    if (!actor) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -126,6 +146,18 @@ export async function DELETE(request: NextRequest) {
         { error: 'Session ID is required' },
         { status: 400 }
       );
+    }
+
+    if (actor.role === 'project') {
+      const scope = await resolveAnalyticsScope(actor);
+      const sessions = await getUserSessions(scope);
+      const allowed = sessions.some((session) => session.sessionId === sessionId);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Session not found' },
+          { status: 404 }
+        );
+      }
     }
 
     const deleted = await deleteUserSession(sessionId);
@@ -146,4 +178,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

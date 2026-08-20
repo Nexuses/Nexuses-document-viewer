@@ -457,11 +457,13 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
               ×
             </button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {link.companyLogo ? (
-              <img src={link.companyLogo} alt="" className="h-11 w-11 rounded-full object-cover bg-white" />
+              <div className="bg-white rounded-xl px-2.5 py-2 flex items-center justify-center shrink-0">
+                <img src={link.companyLogo} alt="" className="h-10 max-w-[140px] object-contain" />
+              </div>
             ) : (
-              <div className="h-11 w-11 rounded-full bg-[#3d5561] flex items-center justify-center text-[15px] font-semibold">
+              <div className="h-10 px-3 rounded-xl bg-[#3d5561] flex items-center justify-center text-[15px] font-semibold shrink-0">
                 {initials(ownerName)}
               </div>
             )}
@@ -508,27 +510,6 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
               </button>
             );
           })}
-        </div>
-
-        <div className="shrink-0 px-6 py-4">
-          <div className="flex items-center gap-4 text-[12px]" style={{ color: '#9aadb6' }}>
-            <a href="#privacy-policy" className="hover:text-white">
-              Privacy policy
-            </a>
-            <a href="#cookie-policy" className="hover:text-white">
-              Cookie policy
-            </a>
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-[13px] text-white">
-            {link.companyLogo ? (
-              <img src={link.companyLogo} alt="" className="h-5 w-5 object-contain" />
-            ) : (
-              <span className="h-5 w-5 rounded-[3px] bg-white text-[#1c2b36] text-[11px] font-bold flex items-center justify-center">
-                N
-              </span>
-            )}
-            <span>Powered by Nexuses</span>
-          </div>
         </div>
       </aside>
 

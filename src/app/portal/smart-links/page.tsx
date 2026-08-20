@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import SmartLinkActionsMenu from '@/components/smart-link/SmartLinkActionsMenu';
 import type { SmartLink } from '@/lib/smart-link-types';
 
 export default function PortalSmartLinksPage() {
@@ -70,7 +71,7 @@ export default function PortalSmartLinksPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-md:overflow-x-auto">
-        <table className="w-full text-sm max-md:min-w-[42rem]">
+        <table className="w-full text-sm max-md:min-w-[32rem]">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Smart Link Title</th>
@@ -103,26 +104,13 @@ export default function PortalSmartLinksPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 max-md:whitespace-nowrap max-md:text-center">
-                  <div className="flex flex-wrap gap-2 max-md:flex-nowrap max-md:gap-3 max-md:justify-center">
-                    <Link className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={`/portal/smart-links/${link._id}`}>
-                      View
-                    </Link>
-                    <Link className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={`/portal/smart-links/${link._id}/edit`}>
-                      Edit
-                    </Link>
-                    <button className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" type="button" onClick={() => duplicate(link._id!)}>
-                      Duplicate
-                    </button>
-                    <button className="text-xs font-semibold text-red-700 underline max-md:shrink-0" type="button" onClick={() => setDeleteId(link._id!)}>
-                      Delete
-                    </button>
-                    <a className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" href={shareUrl(link.slug)} target="_blank" rel="noreferrer">
-                      Share
-                    </a>
-                    <button className="text-xs font-semibold text-[#120C29] underline max-md:shrink-0" type="button" onClick={() => copyLink(link.slug)}>
-                      Copy Link
-                    </button>
-                  </div>
+                  <SmartLinkActionsMenu
+                    slug={link.slug}
+                    linkId={link._id!}
+                    onDuplicate={duplicate}
+                    onDelete={setDeleteId}
+                    onCopyLink={copyLink}
+                  />
                 </td>
               </tr>
             ))}

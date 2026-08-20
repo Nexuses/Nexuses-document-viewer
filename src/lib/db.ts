@@ -338,7 +338,27 @@ export async function createAnalyticsEvent(
   };
 }
 
-export async function getAnalytics(): Promise<Analytics[]> {
+export type AnalyticsScope = {
+  smartLinkIds: Set<string>;
+  smartLinkSlugs: Set<string>;
+};
+
+function matchesAnalyticsScope(
+  event: Pick<Analytics, 'smartLinkId' | 'smartLinkSlug'>,
+  scope?: AnalyticsScope
+): boolean {
+  if (!scope) return true;
+  const id = event.smartLinkId || '';
+  const slug = event.smartLinkSlug || '';
+  return (Boolean(id) && scope.smartLinkIds.has(id)) || (Boolean(slug) && scope.smartLinkSlugs.has(slug));
+}
+
+function filterAnalyticsByScope(events: Analytics[], scope?: AnalyticsScope): Analytics[] {
+  if (!scope) return events;
+  return events.filter((event) => matchesAnalyticsScope(event, scope));
+}
+
+export async function getAnalytics(scope?: AnalyticsScope): Promise<Analytics[]> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
   const analytics = await db.collection<Analytics>('analytics')
@@ -346,10 +366,13 @@ export async function getAnalytics(): Promise<Analytics[]> {
     .sort({ timestamp: -1 })
     .toArray();
   
-  return analytics.map(item => ({
-    ...item,
-    _id: item._id?.toString(),
-  }));
+  return filterAnalyticsByScope(
+    analytics.map(item => ({
+      ...item,
+      _id: item._id?.toString(),
+    })),
+    scope
+  );
 }
 
 export interface AnalyticsSummary {
@@ -427,14 +450,26 @@ async function buildSessionGeoMap(events: Analytics[]): Promise<Map<string, GeoL
   return result;
 }
 
-export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(scope?: AnalyticsScope): Promise<AnalyticsSummary> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
   
-  const [allAnalytics, leadCount] = await Promise.all([
+  const [rawAnalytics, formSubmissions] = await Promise.all([
     db.collection<Analytics>('analytics').find({}).toArray(),
-    db.collection('formSubmissions').countDocuments({}),
+    db.collection('formSubmissions').find({}).toArray(),
   ]);
+  const allAnalytics = filterAnalyticsByScope(rawAnalytics, scope);
+  const leadCount = scope
+    ? formSubmissions.filter((submission) =>
+        matchesAnalyticsScope(
+          {
+            smartLinkId: (submission as { smartLinkId?: string }).smartLinkId,
+            smartLinkSlug: (submission as { smartLinkSlug?: string }).smartLinkSlug,
+          },
+          scope
+        )
+      ).length
+    : formSubmissions.length;
   
   const uniqueSessions = new Set(allAnalytics.map((a) => a.sessionId));
   const totalSessions = uniqueSessions.size;
@@ -578,14 +613,15 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
   };
 }
 
-export async function getUserSessions(): Promise<UserSession[]> {
+export async function getUserSessions(scope?: AnalyticsScope): Promise<UserSession[]> {
   const client = await clientPromise;
   const db = client.db('nexuses-asset');
   
-  const allAnalytics = await db.collection<Analytics>('analytics')
+  const rawAnalytics = await db.collection<Analytics>('analytics')
     .find({})
     .sort({ timestamp: 1 })
     .toArray();
+  const allAnalytics = filterAnalyticsByScope(rawAnalytics, scope);
   
   // Get form submissions to link emails to sessions
   const formSubmissions = await db.collection<FormSubmission>('formSubmissions')
