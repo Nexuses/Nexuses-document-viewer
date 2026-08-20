@@ -106,9 +106,11 @@ export default function PublicSmartLinkPage() {
           </div>
           <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 z-20">
             {link.companyLogo ? (
-              <img src={link.companyLogo} alt="" className="h-24 w-24 rounded-full object-cover border-4 border-white bg-white shadow-md" />
+              <div className="bg-white rounded-xl px-4 py-3 shadow-md border border-white">
+                <img src={link.companyLogo} alt="" className="h-16 max-w-[180px] object-contain" />
+              </div>
             ) : (
-              <div className="h-24 w-24 rounded-full border-4 border-white bg-[#2f5d73] text-white flex items-center justify-center text-2xl font-semibold shadow-md">
+              <div className="h-16 px-5 rounded-xl border border-white bg-[#2f5d73] text-white flex items-center justify-center text-2xl font-semibold shadow-md">
                 {initials(ownerName)}
               </div>
             )}
