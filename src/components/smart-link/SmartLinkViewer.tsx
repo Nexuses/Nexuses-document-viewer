@@ -272,6 +272,7 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
   const [selectedId, setSelectedId] = useState(items[0]?.id);
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const selected = items.find((i) => i.id === selectedId) || items[0];
   const ownerName = displayName(link.owner);
   const geoRef = useClientGeo();
@@ -409,6 +410,27 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
     a.remove();
   };
 
+  const contentUrl = (item: SmartLinkContentItem) => item.fileUrl || item.url || '';
+
+  const copyContentUrl = async (
+    item: SmartLinkContentItem,
+    e: { stopPropagation: () => void; preventDefault?: () => void }
+  ) => {
+    e.stopPropagation();
+    e.preventDefault?.();
+    const url = contentUrl(item);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(item.id);
+      window.setTimeout(() => {
+        setCopiedId((current) => (current === item.id ? null : current));
+      }, 1600);
+    } catch {
+      alert('Could not copy URL');
+    }
+  };
+
   return (
     <div
       className="h-dvh w-screen overflow-hidden flex max-md:flex-col"
@@ -494,19 +516,45 @@ export default function SmartLinkViewer({ link }: { link: SmartLink }) {
                     {itemMeta(item, pages)}
                   </p>
                 </div>
-                {active && item.fileUrl && (item.type === 'pdf' || item.type === 'ppt' || item.type === 'doc') && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => download(item, e)}
-                    className="p-1 text-white shrink-0"
-                    title="Download"
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14" />
-                    </svg>
-                  </span>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {active && contentUrl(item) && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => void copyContentUrl(item, e)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          void copyContentUrl(item, e);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-1.5 py-1 rounded text-[11px] font-medium text-white/90 hover:bg-white/10"
+                      title="Copy content URL"
+                    >
+                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.8}
+                          d="M10 13a5 5 0 007.07 0l2.12-2.12a5 5 0 00-7.07-7.07L10.7 5.24M14 11a5 5 0 00-7.07 0L4.81 13.12a5 5 0 107.07 7.07L13.3 18.76"
+                        />
+                      </svg>
+                      {copiedId === item.id ? 'Copied' : 'Copy URL'}
+                    </span>
+                  )}
+                  {active && item.fileUrl && (item.type === 'pdf' || item.type === 'ppt' || item.type === 'doc') && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => download(item, e)}
+                      className="p-1 text-white shrink-0 hover:bg-white/10 rounded"
+                      title="Download"
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}

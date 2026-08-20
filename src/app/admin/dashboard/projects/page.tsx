@@ -218,38 +218,38 @@ export default function ProjectsPage() {
             <table className="w-full text-sm max-md:min-w-[42rem]">
               <thead>
                 <tr className="text-left text-[#4b6b8a] border-b border-gray-100">
-                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Name</th>
-                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Slug</th>
-                  <th className="px-5 py-2.5 font-semibold max-md:whitespace-nowrap">Users</th>
-                  <th className="px-5 py-2.5 font-semibold text-center max-md:whitespace-nowrap">Logo</th>
-                  <th className="px-5 py-2.5" />
+                  <th className="px-4 py-2 font-semibold max-md:whitespace-nowrap">Name</th>
+                  <th className="px-4 py-2 font-semibold max-md:whitespace-nowrap">Slug</th>
+                  <th className="px-4 py-2 font-semibold max-md:whitespace-nowrap">Users</th>
+                  <th className="px-4 py-2 font-semibold text-center max-md:whitespace-nowrap">Logo</th>
+                  <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {projects.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-gray-400">
+                    <td colSpan={5} className="px-4 py-6 text-gray-400">
                       No projects yet.
                     </td>
                   </tr>
                 ) : (
                   projects.map((project) => (
                     <tr key={project._id} className="border-t border-gray-100">
-                      <td className="px-5 py-2.5 align-middle text-gray-800 max-md:whitespace-nowrap">{project.name}</td>
-                      <td className="px-5 py-2.5 align-middle text-gray-600 max-md:whitespace-nowrap">{project.slug}</td>
-                      <td className="px-5 py-2.5 align-middle text-gray-800">{project.userCount}</td>
-                      <td className="px-5 py-2.5 align-middle text-center">
+                      <td className="px-4 py-2 align-middle text-gray-800 max-md:whitespace-nowrap">{project.name}</td>
+                      <td className="px-4 py-2 align-middle text-gray-600 max-md:whitespace-nowrap">{project.slug}</td>
+                      <td className="px-4 py-2 align-middle text-gray-800">{project.userCount}</td>
+                      <td className="px-4 py-2 align-middle text-center">
                         {project.logoUrl ? (
                           <img
                             src={project.logoUrl}
                             alt=""
-                            className="h-18 w-32 rounded object-contain inline-block"
+                            className="h-8 max-w-[7.5rem] rounded object-contain inline-block"
                           />
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-2.5 align-middle text-right whitespace-nowrap">
+                      <td className="px-4 py-2 align-middle text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => startEditProject(project)}
