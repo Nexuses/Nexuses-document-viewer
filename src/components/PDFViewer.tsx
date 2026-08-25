@@ -6,12 +6,9 @@ import ShareButton from '@/components/ShareButton';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { configurePdfWorker } from '@/lib/pdf-worker';
 
-// Set up PDF.js worker - use version that matches react-pdf's pdfjs-dist
-if (typeof window !== 'undefined') {
-  // Use local worker file from public directory (matches react-pdf's pdfjs-dist version)
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-}
+configurePdfWorker(pdfjs);
 
 interface PDFViewerProps {
   url: string;

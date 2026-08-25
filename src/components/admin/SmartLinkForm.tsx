@@ -116,7 +116,10 @@ export default function SmartLinkForm({
 
   const handleTitle = (value: string) => {
     setTitle(value);
-    if (!isEdit && !slug) setSlug(slugify(value));
+  };
+
+  const generateSlug = () => {
+    setSlug(slugify(title));
   };
 
   const setItemUrl = (item: SmartLinkContentItem, value: string) => {
@@ -242,8 +245,30 @@ export default function SmartLinkForm({
           {companyLogo && <img src={companyLogo} alt="" className="mt-2 h-12 object-contain" />}
         </Field>
         <Field label="Slug">
-          <input required value={slug} onChange={(e) => setSlug(slugify(e.target.value))} className={inputClass} />
-          <p className="text-xs text-gray-500 mt-1">Public URL: /s/{slug || 'your-slug'}</p>
+          <div className="flex gap-2 max-md:flex-col">
+            <input
+              required
+              value={slug}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Allow clearing the field; only sanitize non-empty input
+                setSlug(value.trim() === '' ? '' : slugify(value));
+              }}
+              placeholder="your-slug"
+              className={`${inputClass} flex-1`}
+            />
+            <button
+              type="button"
+              onClick={generateSlug}
+              disabled={!title.trim()}
+              className="shrink-0 px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Generate
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Public URL: /s/{slug || 'your-slug'}. Enter a slug manually or click Generate from the title.
+          </p>
         </Field>
         <Field label="Status">
           <select

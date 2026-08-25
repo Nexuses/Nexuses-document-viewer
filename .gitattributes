@@ -1,0 +1,5 @@
+# Keep GitHub language stats focused on TypeScript app code
+public/**/*.min.js linguist-vendored
+public/**/*.min.mjs linguist-vendored
+*.min.js linguist-vendored
+*.min.mjs linguist-vendored

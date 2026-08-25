@@ -37,9 +37,8 @@ async function uploadFile(file: File): Promise<string> {
 export async function countPdfPages(file: File): Promise<number | undefined> {
   try {
     const { pdfjs } = await import('react-pdf');
-    if (typeof window !== 'undefined') {
-      pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-    }
+    const { configurePdfWorker } = await import('@/lib/pdf-worker');
+    configurePdfWorker(pdfjs);
     const data = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data }).promise;
     return pdf.numPages;

@@ -53,6 +53,16 @@ export default function PortalSmartLinksPage() {
     load();
   };
 
+  const updateStatus = async (id: string, status: 'draft' | 'published') => {
+    setLinks((prev) => prev.map((link) => (link._id === id ? { ...link, status } : link)));
+    const res = await fetch(`/api/smart-links/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) load();
+  };
+
   return (
     <div className="p-8 max-md:overflow-x-hidden">
       <div className="flex items-center justify-between mb-6 max-md:flex-col max-md:items-stretch max-md:gap-4">
@@ -93,20 +103,25 @@ export default function PortalSmartLinksPage() {
                 <td className="px-4 py-3 font-medium text-gray-900 max-md:whitespace-nowrap">{link.title}</td>
                 <td className="px-4 py-3 text-gray-600 max-md:whitespace-nowrap">{link.owner}</td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  <select
+                    value={link.status}
+                    onChange={(e) => updateStatus(link._id!, e.target.value as 'draft' | 'published')}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold border-0 outline-none cursor-pointer ${
                       link.status === 'published'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-700'
                     }`}
+                    aria-label={`Status for ${link.title}`}
                   >
-                    {link.status}
-                  </span>
+                    <option value="draft">draft</option>
+                    <option value="published">published</option>
+                  </select>
                 </td>
                 <td className="px-4 py-3 max-md:whitespace-nowrap max-md:text-center">
                   <SmartLinkActionsMenu
                     slug={link.slug}
                     linkId={link._id!}
+                    editHref={`/portal/smart-links/${link._id}/edit`}
                     onDuplicate={duplicate}
                     onDelete={setDeleteId}
                     onCopyLink={copyLink}

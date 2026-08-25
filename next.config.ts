@@ -4,13 +4,14 @@ import path from "path";
 const projectRoot = path.resolve(__dirname);
 
 const nextConfig: NextConfig = {
-  // Nested folder + extra lockfiles make Next pick the parent as root,
-  // so CSS then looks for tailwindcss in the wrong directory.
+  // Keep resolution inside this app (parent folders can confuse Turbopack).
   outputFileTracingRoot: projectRoot,
   turbopack: {
     root: projectRoot,
+    // Must be a relative path — absolute Windows paths fail with
+    // "windows imports are not implemented yet".
     resolveAlias: {
-      tailwindcss: path.join(projectRoot, "node_modules/tailwindcss"),
+      tailwindcss: "./node_modules/tailwindcss",
     },
   },
   images: {

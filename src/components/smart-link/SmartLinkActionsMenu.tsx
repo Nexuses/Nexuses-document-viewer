@@ -6,12 +6,20 @@ import { createPortal } from 'react-dom';
 interface Props {
   slug: string;
   linkId: string;
+  editHref: string;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onCopyLink: (slug: string) => void;
 }
 
-export default function SmartLinkActionsMenu({ slug, linkId, onDuplicate, onDelete, onCopyLink }: Props) {
+export default function SmartLinkActionsMenu({
+  slug,
+  linkId,
+  editHref,
+  onDuplicate,
+  onDelete,
+  onCopyLink,
+}: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -101,6 +109,13 @@ export default function SmartLinkActionsMenu({ slug, linkId, onDuplicate, onDele
               onClick={() => setOpen(false)}
             >
               View
+            </a>
+            <a
+              href={editHref}
+              className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+              onClick={() => setOpen(false)}
+            >
+              Edit
             </a>
             <button
               type="button"
