@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { resolveMediaUrl } from '@/lib/document-meta';
+import { configurePdfWorker } from '@/lib/pdf-worker';
 import { ViewerToolbar, ZoomSurface } from './ViewerStage';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-}
+configurePdfWorker(pdfjs);
 
 const PDF_OPTIONS = {
   cMapUrl: 'https://unpkg.com/pdfjs-dist@5.4.296/cmaps/',

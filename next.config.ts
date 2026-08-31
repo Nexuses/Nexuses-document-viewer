@@ -14,6 +14,19 @@ const nextConfig: NextConfig = {
       tailwindcss: "./node_modules/tailwindcss",
     },
   },
+  webpack: (config, { dev }) => {
+    // pdfjs-dist 5.x is incompatible with Webpack's eval-* source maps in
+    // development, which causes "Object.defineProperty called on non-object".
+    if (dev) {
+      config.devtool = 'source-map';
+      config.plugins = config.plugins.filter(
+        (plugin: unknown) =>
+          (plugin as { constructor?: { name?: string } })?.constructor?.name !==
+          'EvalSourceMapDevToolPlugin'
+      );
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

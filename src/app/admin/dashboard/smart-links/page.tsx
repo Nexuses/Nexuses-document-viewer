@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import SmartLinkActionsMenu from '@/components/smart-link/SmartLinkActionsMenu';
+import SmartLinkEmailGateToggle from '@/components/smart-link/SmartLinkEmailGateToggle';
 import type { SmartLink } from '@/lib/smart-link-types';
 
 type ProjectOption = { _id: string; name: string };
@@ -77,6 +78,16 @@ export default function SmartLinksPage() {
     if (!res.ok) load();
   };
 
+  const updateEmailGate = async (id: string, requireEmail: boolean) => {
+    setLinks((prev) => prev.map((link) => (link._id === id ? { ...link, requireEmail } : link)));
+    const res = await fetch(`/api/smart-links/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requireEmail }),
+    });
+    if (!res.ok) load();
+  };
+
   return (
     <div className="p-8 max-md:overflow-x-hidden">
       <div className="flex items-center justify-between mb-6 max-md:flex-col max-md:items-stretch max-md:gap-4">
@@ -95,20 +106,21 @@ export default function SmartLinksPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden max-md:overflow-x-auto">
-        <table className="w-full text-sm max-md:min-w-[36rem]">
+        <table className="w-full text-sm max-md:min-w-xl">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Smart Link Title</th>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Project</th>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Owner</th>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Status</th>
+              <th className="px-4 py-3 font-medium max-md:whitespace-nowrap">Name &amp; Email</th>
               <th className="px-4 py-3 font-medium max-md:whitespace-nowrap max-md:text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {links.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                   No smart links yet.
                 </td>
               </tr>
@@ -125,7 +137,7 @@ export default function SmartLinksPage() {
                       const projectName = projects.find((item) => item._id === projectId)?.name || 'the selected project';
                       setMove({ link, projectId, projectName });
                     }}
-                    className="max-w-[180px] px-2 py-1.5 border border-gray-300 rounded-md bg-white text-gray-900 max-md:!max-w-[180px] max-md:w-[180px]"
+                    className="max-w-[180px] px-2 py-1.5 border border-gray-300 rounded-md bg-white text-gray-900 max-md:max-w-[180px]! max-md:w-[180px]"
                   >
                     <option value="" disabled>
                       Select project
@@ -152,6 +164,13 @@ export default function SmartLinksPage() {
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
+                </td>
+                <td className="px-4 py-3">
+                  <SmartLinkEmailGateToggle
+                    enabled={link.requireEmail !== false}
+                    label={link.title}
+                    onChange={(enabled) => void updateEmailGate(link._id!, enabled)}
+                  />
                 </td>
                 <td className="px-4 py-3 max-md:whitespace-nowrap max-md:text-center">
                   <SmartLinkActionsMenu

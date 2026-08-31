@@ -51,6 +51,7 @@ export interface SmartLink {
   projectId?: string;
   projectName?: string;
   status: SmartLinkStatus;
+  requireEmail?: boolean;
   content: SmartLinkContentItem[];
   views: number;
   createdAt?: Date | string;

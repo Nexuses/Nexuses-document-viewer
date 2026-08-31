@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       projectId: project.projectId,
       projectName: project.projectName,
       status: body.status === 'published' ? 'published' : 'draft',
+      requireEmail: body.requireEmail !== false,
       content,
     });
 

@@ -55,9 +55,8 @@ export async function countPdfPagesFromUrl(url: string): Promise<number | undefi
   try {
     const resolved = await resolveMediaUrl(url);
     const { pdfjs } = await import('react-pdf');
-    if (typeof window !== 'undefined') {
-      pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-    }
+    const { configurePdfWorker } = await import('@/lib/pdf-worker');
+    configurePdfWorker(pdfjs);
     const pdf = await pdfjs.getDocument(resolved).promise;
     return pdf.numPages;
   } catch {

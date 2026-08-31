@@ -87,6 +87,7 @@ export default function SmartLinkForm({
   const [companyLogo, setCompanyLogo] = useState(initial?.companyLogo || '');
   const [slug, setSlug] = useState(initial?.slug || '');
   const [status, setStatus] = useState(initial?.status || 'draft');
+  const [requireEmail, setRequireEmail] = useState(initial?.requireEmail !== false);
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [content, setContent] = useState<SmartLinkContentItem[]>(initial?.content || []);
@@ -143,6 +144,7 @@ export default function SmartLinkForm({
         companyLogo,
         slug,
         status,
+        requireEmail,
         content,
         ...(showProjectSelect ? { projectId } : {}),
       };
@@ -280,6 +282,35 @@ export default function SmartLinkForm({
             <option value="published">Published</option>
           </select>
         </Field>
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Require name and email</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Ask visitors for their name and email before opening this Smart Link.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`text-xs font-medium ${requireEmail ? 'text-[#120C29]' : 'text-gray-500'}`}>
+              {requireEmail ? 'Enabled' : 'Disabled'}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={requireEmail}
+              onClick={() => setRequireEmail((value) => !value)}
+              className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
+                requireEmail ? 'bg-[#120C29]' : 'bg-gray-300'
+              }`}
+              aria-label="Require name and email"
+            >
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  requireEmail ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 max-md:p-4">

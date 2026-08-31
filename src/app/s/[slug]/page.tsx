@@ -35,7 +35,9 @@ export default function PublicSmartLinkPage() {
           setMissing(true);
           return;
         }
-        setLink(await r.json());
+        const data = await r.json();
+        setLink(data);
+        if (data.requireEmail === false) setShowViewer(true);
       })
       .catch(() => setMissing(true));
   }, [slug]);

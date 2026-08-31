@@ -54,6 +54,7 @@ export async function PATCH(
     if (typeof body.coverImage === 'string') updates.coverImage = body.coverImage;
     if (typeof body.companyLogo === 'string') updates.companyLogo = body.companyLogo;
     if (body.status === 'draft' || body.status === 'published') updates.status = body.status;
+    if (typeof body.requireEmail === 'boolean') updates.requireEmail = body.requireEmail;
     if (Array.isArray(body.content)) updates.content = body.content;
 
     if (typeof body.slug === 'string') {

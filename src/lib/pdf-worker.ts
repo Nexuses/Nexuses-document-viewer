@@ -8,6 +8,6 @@ export function configurePdfWorker(pdfjs: {
 }) {
   if (typeof window === 'undefined') return;
 
-  const version = pdfjs.version || '5.4.449';
+  const version = pdfjs.version || '5.4.296';
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.mjs`;
 }
