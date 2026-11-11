@@ -10,8 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.948.0",
-    "@aws-sdk/s3-request-presigner": "^3.948.0",
+    "@aws-sdk/client-s3": "^3.1166.0",
+    "@aws-sdk/s3-request-presigner": "^3.1166.0",
     "@tailwindcss/postcss": "^4",
     "bcryptjs": "^3.0.3",
     "mongodb": "^7.0.0",
